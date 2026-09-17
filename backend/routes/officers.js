@@ -133,8 +133,8 @@ router.get('/:id', async (req, res) => {
       where: { id: req.params.id, isActive: true },
       include: {
         ...officerInclude,
-        createdBy: { select: { id: true, username: true, fullName: true } },
-        updatedBy: { select: { id: true, username: true, fullName: true } }
+        createdBy: { select: { id: true, email: true, fullName: true } },
+        updatedBy: { select: { id: true, email: true, fullName: true } }
       }
     });
     if (!officer) return res.status(404).json({ error: 'Officer not found' });

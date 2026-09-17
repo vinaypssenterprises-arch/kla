@@ -11,12 +11,12 @@ const DISTRICTS = [
 ];
 
 async function seedAdmin() {
-  const admin = await prisma.user.findUnique({ where: { username: 'admin' } });
+  const admin = await prisma.user.findUnique({ where: { email: 'admin' } });
 
   if (!admin) {
     await prisma.user.create({
       data: {
-        username: 'admin',
+        email: 'admin',
         password: await bcrypt.hash('admin', 10),
         fullName: 'Administrator',
         role: 'admin',
@@ -30,7 +30,7 @@ async function seedAdmin() {
   // Backfill role for a pre-existing admin row created before roles/hashing existed
   if (admin.role !== 'admin' || !admin.password.startsWith('$2')) {
     await prisma.user.update({
-      where: { username: 'admin' },
+      where: { email: 'admin' },
       data: {
         role: 'admin',
         password: admin.password.startsWith('$2') ? admin.password : await bcrypt.hash(admin.password, 10)
