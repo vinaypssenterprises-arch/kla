@@ -102,7 +102,7 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments 
       peStatus: initialData.peStatus || '',
       sirEo: initialData.sirEo || '',
     } : {
-      district: localStorage.getItem('isHeadOffice') !== '1' ? (localStorage.getItem('districtName') || '') : '', 
+      district: isAdminNewPetition ? '' : (localStorage.getItem('isHeadOffice') !== '1' ? (localStorage.getItem('districtName') || '') : ''), 
       petitionNo: '', petitionerName: '', petitionerAddress: '', respondents: [], sirEo: '',
       proposalStatus: '', proposalSentDate: '',
       peNo: '', peRegDate: '', peReportSentDate: '', peStatus: '',
@@ -253,7 +253,7 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments 
                     options={districtOptions}
                     label="Select District"
                     placeholder="Select district"
-                    disabled={!canEditIandII || localStorage.getItem('isHeadOffice') !== '1'}
+                    disabled={!canEditIandII || (!isAdminNewPetition && localStorage.getItem('isHeadOffice') !== '1')}
                   />
                 )}
               />
