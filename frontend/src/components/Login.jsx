@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Shield } from 'lucide-react';
-import { apiFetch } from '../lib/api';
+import { BASE_URL } from '../lib/api';
 
 export default function Login({ onLogin }) {
   const [email, setEmail] = useState('');
@@ -15,7 +15,7 @@ export default function Login({ onLogin }) {
     setError('');
     
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://lokayukta.duckdns.org/api'}/auth/login`, {
+      const response = await fetch(`${BASE_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })

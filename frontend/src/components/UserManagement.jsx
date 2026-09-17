@@ -54,11 +54,6 @@ export default function UserManagement() {
     }
   }, [form.supervisorDesignationId]);
 
-  const authHeaders = () => ({
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${localStorage.getItem('token')}`
-  });
-
   const fetchInitialData = async () => {
     setLoading(true);
     try {
@@ -167,16 +162,15 @@ export default function UserManagement() {
     setSaving(true);
     try {
       const url = editingUser
-        ? `http://localhost:5000/api/users/${editingUser.id}`
-        : 'http://localhost:5000/api/users';
+        ? `/users/${editingUser.id}`
+        : '/users';
 
       const payload = { ...form };
       delete payload.confirmPassword;
       if (editingUser && !payload.password) delete payload.password;
 
-      const res = await fetch(url, {
+      const res = await apiFetch(url, {
         method: editingUser ? 'PUT' : 'POST',
-        headers: authHeaders(),
         body: JSON.stringify(payload)
       });
 

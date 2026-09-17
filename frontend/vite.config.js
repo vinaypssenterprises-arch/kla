@@ -8,6 +8,16 @@ export default defineConfig({
     host: true,
     port: 5173,
     allowedHosts: ['lokayukta.duckdns.org'],
+    // Only override the HMR client target when explicitly told to (set via docker-compose
+    // for the production container, which sits behind an HTTPS reverse proxy). Left unset,
+    // plain local `npm run dev` keeps Vite's normal same-origin ws:// HMR behavior.
+    ...(process.env.VITE_HMR_HOST ? {
+      hmr: {
+        protocol: 'wss',
+        host: process.env.VITE_HMR_HOST,
+        clientPort: 443,
+      },
+    } : {}),
   },
   build: {
     chunkSizeWarningLimit: 600,

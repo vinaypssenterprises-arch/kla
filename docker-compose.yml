@@ -42,6 +42,9 @@ services:
     container_name: 17a_frontend
     ports:
       - "5173:5173"
+    environment:
+      VITE_API_URL: "https://lokayukta.duckdns.org/api"
+      VITE_HMR_HOST: "lokayukta.duckdns.org"
     volumes:
       - ./frontend:/app
       - /app/node_modules

@@ -108,15 +108,13 @@ function OfficerFormInner({ initialData, districts }) {
       previousPlaces: (data.previousPlaces || []).filter(p => p.place && p.place.trim())
     };
 
-    const token = localStorage.getItem('token');
     const url = isEdit
-      ? `http://localhost:5000/api/officers/${initialData.id}`
-      : 'http://localhost:5000/api/officers';
+      ? `/officers/${initialData.id}`
+      : '/officers';
 
     try {
-      const res = await fetch(url, {
+      const res = await apiFetch(url, {
         method: isEdit ? 'PUT' : 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify(payload)
       });
 

@@ -5,6 +5,7 @@ import { exportOfficersToExcel } from '../lib/exportExcel';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import SearchableSelect from '../components/ui/SearchableSelect';
 import { useToast } from '../components/ui/ToastProvider';
+import { apiFetch } from '../lib/api';
 
 const PAGE_SIZE = 10;
 
@@ -30,14 +31,12 @@ export default function OfficersList() {
   const [deleting, setDeleting] = useState(false);
   const { showError } = useToast();
 
-  const authHeaders = () => ({ 'Authorization': `Bearer ${localStorage.getItem('token')}` });
-
   useEffect(() => {
-    fetch('http://localhost:5000/api/districts', { headers: authHeaders() })
+    apiFetch('/districts')
       .then(res => res.ok ? res.json() : [])
       .then(data => setDistricts(data.filter(d => d.isActive)))
       .catch(err => console.error('Failed to load districts', err));
-    fetch('http://localhost:5000/api/officers/meta/designations', { headers: authHeaders() })
+    apiFetch('/officers/meta/designations')
       .then(res => res.ok ? res.json() : [])
       .then(setDesignations)
       .catch(err => console.error('Failed to load designations', err));
@@ -50,7 +49,7 @@ export default function OfficersList() {
     if (districtId) params.set('districtId', districtId);
     if (designation) params.set('designation', designation);
 
-    fetch(`http://localhost:5000/api/officers?${params.toString()}`, { headers: authHeaders() })
+    apiFetch(`/officers?${params.toString()}`)
       .then(res => res.ok ? res.json() : Promise.reject())
       .then(data => {
         setOfficers(data.data);
@@ -87,10 +86,7 @@ export default function OfficersList() {
     if (!deleteTarget) return;
     setDeleting(true);
     try {
-      const res = await fetch(`http://localhost:5000/api/officers/${deleteTarget.id}`, {
-        method: 'DELETE',
-        headers: authHeaders()
-      });
+      const res = await apiFetch(`/officers/${deleteTarget.id}`, { method: 'DELETE' });
       if (res.ok) {
         setDeleteTarget(null);
         fetchOfficers();

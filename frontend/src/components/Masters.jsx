@@ -35,16 +35,11 @@ export default function Masters() {
   const [deleting, setDeleting] = useState(false);
   const { showError } = useToast();
 
-  const authHeaders = () => ({
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${localStorage.getItem('token')}`
-  });
-
   const baseUrl = active.isDistrict
-    ? 'http://localhost:5000/api/districts'
-    : active.isCustom 
-    ? `http://localhost:5000/api/${active.apiCategory}`
-    : `http://localhost:5000/api/master-items/${active.apiCategory}`;
+    ? '/districts'
+    : active.isCustom
+    ? `/${active.apiCategory}`
+    : `/master-items/${active.apiCategory}`;
 
   useEffect(() => {
     fetchItems();
@@ -53,11 +48,11 @@ export default function Masters() {
   const fetchItems = async () => {
     setLoading(true);
     try {
-      const res = await fetch(baseUrl, { headers: authHeaders() });
+      const res = await apiFetch(baseUrl);
       if (res.ok) setItems(await res.json());
-      
+
       if (active.apiCategory === 'subDepartment') {
-        const deptRes = await apiFetch(`/master-items/department`, {  });
+        const deptRes = await apiFetch('/master-items/department');
         if (deptRes.ok) setDepartments(await deptRes.json());
       }
     } catch (err) {
@@ -102,9 +97,8 @@ export default function Masters() {
     setSaving(true);
     try {
       const url = editingItem ? `${baseUrl}/${editingItem.id}` : baseUrl;
-      const res = await fetch(url, {
+      const res = await apiFetch(url, {
         method: editingItem ? 'PUT' : 'POST',
-        headers: authHeaders(),
         body: JSON.stringify(form)
       });
 
@@ -127,7 +121,7 @@ export default function Masters() {
     if (!deleteTarget) return;
     setDeleting(true);
     try {
-      const res = await fetch(`${baseUrl}/${deleteTarget.id}`, { method: 'DELETE', headers: authHeaders() });
+      const res = await apiFetch(`${baseUrl}/${deleteTarget.id}`, { method: 'DELETE' });
       if (res.ok) {
         setDeleteTarget(null);
         fetchItems();
