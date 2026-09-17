@@ -15,7 +15,7 @@ export default function Login({ onLogin }) {
     setError('');
     
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/auth/login`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://13.233.160.230:5000/api'}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
