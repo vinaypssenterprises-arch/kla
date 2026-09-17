@@ -477,7 +477,7 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments 
                 </div>
               </div>
             ))}
-            {canEditIV && (
+            {canEditIV && !isAdminNewPetition && (
               <div className="mt-4 flex justify-end">
                 <button type="button" className="btn btn-primary" onClick={() => doAction('SUBMIT_CA')} disabled={isSubmitting}>
                   <Save className="w-4 h-4" /> Submit Competent Authority
@@ -523,7 +523,7 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments 
                 </div>
               ))}
             </div>
-            {canEditV && (
+            {canEditV && !isAdminNewPetition && (
               <div className="mt-4 flex justify-end">
                 <button type="button" className="btn btn-primary" onClick={() => doAction('SUBMIT_PERMISSION')} disabled={isSubmitting}>
                   <Save className="w-4 h-4" /> Save Permissions
@@ -566,7 +566,7 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments 
                 <input type="text" className="app-input" {...register('sirEo')} disabled={!canEditVI} />
               </div>
             </div>
-            {canEditVI && (
+            {canEditVI && !isAdminNewPetition && (
               <div className="mt-5 flex justify-end">
                 <button type="button" className="btn btn-primary" onClick={() => doAction('SUBMIT_PE')} disabled={isSubmitting}>
                   <Save className="w-4 h-4" /> Submit Preliminary Enquiry
