@@ -41,7 +41,7 @@ services:
     build: ./frontend
     container_name: 17a_frontend
     ports:
-      - "80:5173"
+      - "5173:5173"
     volumes:
       - ./frontend:/app
       - /app/node_modules
