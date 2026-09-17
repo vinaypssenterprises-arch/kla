@@ -116,7 +116,7 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments 
 
   const handleAddRespondent = () => {
     if (newResp.name) {
-      appendRespondent({ ...newResp, caDesignation: '', caDepartment: '', caSubDepartment: '', caPlace: '', permissionStatus: '', permissionSentDate: '', permissionReceivedFromCA: '', caSentToUnit: '' });
+      appendRespondent({ ...newResp, caDesignation: '', caDepartment: '', caSubDepartment: '', caPlace: '', permissionStatus: '', permissionSentDate: '', permissionReceivedFromCA: '', caSentToUnit: '' }, { shouldFocus: false });
       setNewResp({ name: '', designation: '', office: '', department: '', subDepartment: '' });
     }
   };
