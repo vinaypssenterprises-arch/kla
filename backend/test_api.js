@@ -13,7 +13,7 @@ async function main() {
   );
 
   try {
-    const res = await fetch('http://localhost:5000/api/petitions', {
+    const res = await fetch('http://13.233.160.230:5000/api/petitions', {
       headers: { 'Authorization': `Bearer ${token}` }
     });
     const text = await res.text();

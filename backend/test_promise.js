@@ -1,5 +1,5 @@
 async function test() {
-  const loginRes = await fetch('http://localhost:5000/api/auth/login', {
+  const loginRes = await fetch('http://13.233.160.230:5000/api/auth/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username: 'admin', password: 'admin' })
@@ -9,8 +9,8 @@ async function test() {
 
   try {
     const [petitionsRes, districtsRes] = await Promise.all([
-      fetch('http://localhost:5000/api/petitions', { headers: { 'Authorization': `Bearer ${token}` } }),
-      fetch('http://localhost:5000/api/districts', { headers: { 'Authorization': `Bearer ${token}` } })
+      fetch('http://13.233.160.230:5000/api/petitions', { headers: { 'Authorization': `Bearer ${token}` } }),
+      fetch('http://13.233.160.230:5000/api/districts', { headers: { 'Authorization': `Bearer ${token}` } })
     ]);
     
     console.log('petitions ok:', petitionsRes.ok);

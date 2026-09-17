@@ -32,8 +32,25 @@ const limiter = rateLimit({
 });
 app.use('/api', limiter);
 
-// Core middleware
-app.use(cors());
+// Core middleware — allow frontend on AWS and local dev
+const allowedOrigins = [
+  'http://13.233.160.230',
+  'http://13.233.160.230:5173',
+  'http://13.233.160.230:3000',
+  'http://localhost:5173',
+  'http://localhost:3000',
+];
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, curl, Postman)
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error(`CORS: origin ${origin} not allowed`));
+    }
+  },
+  credentials: true,
+}));
 app.use(express.json({ limit: '2mb' }));
 
 // Routes
