@@ -34,6 +34,7 @@ app.use('/api', limiter);
 
 // Core middleware — allow frontend on AWS and local dev
 const allowedOrigins = [
+  'http://lokayukta.duckdns.org',
   'http://13.233.160.230',
   'http://13.233.160.230:5173',
   'http://13.233.160.230:3000',
