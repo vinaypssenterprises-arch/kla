@@ -79,6 +79,8 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments 
   const status = initialData?.status || 'DRAFT';
   const isCreator = isEdit ? initialData.createdById === currentUserId : true;
   const isSupervisor = isEdit ? initialData.createdBy?.supervisorUserId === currentUserId : false;
+  const isAdmin = localStorage.getItem('role') === 'admin';
+  const isAdminNewPetition = isAdmin && !isEdit;
 
   const { register, control, watch, setValue, getValues, formState: { isSubmitting } } = useForm({
     defaultValues: isEdit ? {
@@ -101,7 +103,9 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments 
       sirEo: initialData.sirEo || '',
     } : {
       district: localStorage.getItem('isHeadOffice') !== '1' ? (localStorage.getItem('districtName') || '') : '', 
-      petitionNo: '', petitionerName: '', petitionerAddress: '', respondents: [], sirEo: ''
+      petitionNo: '', petitionerName: '', petitionerAddress: '', respondents: [], sirEo: '',
+      proposalStatus: '', proposalSentDate: '',
+      peNo: '', peRegDate: '', peReportSentDate: '', peStatus: '',
     }
   });
 
@@ -143,7 +147,7 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments 
     const token = localStorage.getItem('token');
     
     // Validation before specific actions
-    if (actionType === 'CREATE_SUBMIT' || actionType === 'RESUBMIT') {
+    if (actionType === 'CREATE_SUBMIT' || actionType === 'RESUBMIT' || actionType === 'ADMIN_CREATE_FULL') {
       if (!data.district || !data.petitionNo || !data.petitionerName) return setErrorMsg('Petition Details are required.');
       if (data.respondents.length === 0) return setErrorMsg('At least one respondent is required.');
     }
@@ -155,7 +159,16 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments 
     }
 
     try {
-      if (actionType === 'CREATE_SUBMIT') {
+      if (actionType === 'ADMIN_CREATE_FULL') {
+        const res = await apiFetch(`/petitions`, {
+          method: 'POST',
+          body: JSON.stringify({ ...data, adminFullCreate: true })
+        });
+        if (res.ok) {
+          showSuccess('Petition created successfully.');
+          navigate('/register');
+        } else { const e = await res.json(); setErrorMsg(e.error || 'Failed to create'); }
+      } else if (actionType === 'CREATE_SUBMIT') {
         const res = await apiFetch(`/petitions`, {
           method: 'POST',
           body: JSON.stringify({
@@ -186,18 +199,19 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments 
   };
 
   // Section Visibilities and Editability
-  const canEditIandII = status === 'DRAFT' || (status === '17A_RETURNED' && isCreator);
-  const showIII = status !== 'DRAFT' && status !== '17A_RETURNED'; // Hidden on draft and return, visible to sup during SUBMITTED
-  const canEditIII = status === 'SUBMITTED_TO_SUPERVISOR' && isSupervisor;
-  
-  const showIV = ['17A_ACCEPTED', 'CA_SUBMITTED', '17A_PERMISSION_PENDING', '17A_PERMISSION_COMPLETED', 'PRELIMINARY_ENQUIRY_SUBMITTED'].includes(status);
-  const canEditIV = status === '17A_ACCEPTED' && isSupervisor;
-  
-  const showV = ['CA_SUBMITTED', '17A_PERMISSION_PENDING', '17A_PERMISSION_COMPLETED', 'PRELIMINARY_ENQUIRY_SUBMITTED'].includes(status);
-  const canEditV = (status === 'CA_SUBMITTED' || status === '17A_PERMISSION_PENDING') && isSupervisor;
-  
-  const showVI = ['17A_PERMISSION_COMPLETED', 'PRELIMINARY_ENQUIRY_SUBMITTED'].includes(status);
-  const canEditVI = status === '17A_PERMISSION_COMPLETED' && isCreator;
+  // isAdminNewPetition: admin creating new petition → all sections visible & editable in one form
+  const canEditIandII = isAdminNewPetition || status === 'DRAFT' || (status === '17A_RETURNED' && isCreator);
+  const showIII = isAdminNewPetition || (status !== 'DRAFT' && status !== '17A_RETURNED');
+  const canEditIII = (status === 'SUBMITTED_TO_SUPERVISOR') && (isSupervisor || isAdmin);
+
+  const showIV = isAdminNewPetition || ['17A_ACCEPTED', 'CA_SUBMITTED', '17A_PERMISSION_PENDING', '17A_PERMISSION_COMPLETED', 'PRELIMINARY_ENQUIRY_SUBMITTED'].includes(status);
+  const canEditIV = isAdminNewPetition || ((status === '17A_ACCEPTED') && (isSupervisor || isAdmin));
+
+  const showV = isAdminNewPetition || ['CA_SUBMITTED', '17A_PERMISSION_PENDING', '17A_PERMISSION_COMPLETED', 'PRELIMINARY_ENQUIRY_SUBMITTED'].includes(status);
+  const canEditV = isAdminNewPetition || ((status === 'CA_SUBMITTED' || status === '17A_PERMISSION_PENDING') && (isSupervisor || isAdmin));
+
+  const showVI = isAdminNewPetition || ['17A_PERMISSION_COMPLETED', 'PRELIMINARY_ENQUIRY_SUBMITTED'].includes(status);
+  const canEditVI = isAdminNewPetition || ((status === '17A_PERMISSION_COMPLETED') && (isCreator || isAdmin));
 
   return (
     <div>
@@ -355,7 +369,23 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments 
             <h4 className="text-[15px] text-ink-text mb-[18px] font-serif font-semibold flex items-baseline gap-2">
               <span className="font-mono text-[13px] text-brass font-semibold">III.</span> 17-A Proposal
             </h4>
-            {canEditIII ? (
+            {isAdminNewPetition ? (
+              /* Admin creating new petition: simple data-entry (no action buttons) */
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[12.5px] font-semibold text-ink-text-soft">Proposal Status</label>
+                  <select className="app-input" {...register('proposalStatus')}>
+                    <option value="">Select status</option>
+                    <option value="Accept">Accept</option>
+                    <option value="Pending">Pending</option>
+                  </select>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[12.5px] font-semibold text-ink-text-soft">Date Sent to CA</label>
+                  <input type="date" className="app-input" {...register('proposalSentDate')} />
+                </div>
+              </div>
+            ) : canEditIII ? (
               <div className="p-4 bg-parchment border border-dashed border-rule rounded-s">
                 <p className="text-[13px] text-ink-text-soft mb-4">Review the petition details above and choose an action.</p>
                 <div className="flex flex-col gap-1.5 mb-4">
@@ -577,11 +607,21 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments 
 
       {/* Bottom Actions for Draft/Return — sticky within the content column so it always
           lines up with the sidebar's current width/collapsed state instead of a hardcoded pixel offset */}
-      {(status === 'DRAFT' || status === '17A_RETURNED') && canEditIandII && (
+      {(isAdminNewPetition || status === 'DRAFT' || status === '17A_RETURNED') && canEditIandII && (
         <div className="sticky bottom-0 -mx-5 lg:-mx-7 px-5 lg:px-7 mt-6 bg-[#FFFDF7]/90 backdrop-blur-md border-t border-rule py-4 flex justify-end gap-3 z-40">
           <button type="button" className="btn btn-secondary" onClick={() => navigate('/register')}>Cancel</button>
-          <button type="button" className="btn btn-primary" onClick={() => doAction(status === 'DRAFT' ? 'CREATE_SUBMIT' : 'RESUBMIT')} disabled={isSubmitting}>
-            <Save className="w-4 h-4" /> {status === 'DRAFT' ? 'Submit to Supervisor' : 'Resubmit Petition'}
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => doAction(
+              isAdminNewPetition ? 'ADMIN_CREATE_FULL'
+              : status === 'DRAFT' ? 'CREATE_SUBMIT'
+              : 'RESUBMIT'
+            )}
+            disabled={isSubmitting}
+          >
+            <Save className="w-4 h-4" />
+            {isAdminNewPetition ? 'Create Petition' : status === 'DRAFT' ? 'Submit to Supervisor' : 'Resubmit Petition'}
           </button>
         </div>
       )}

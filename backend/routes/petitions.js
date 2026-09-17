@@ -86,6 +86,26 @@ router.post('/', async (req, res) => {
   try {
     const data = req.body;
     const respondentsData = data.respondents || [];
+    const isAdminFullCreate = data.adminFullCreate === true && req.user.role === 'admin';
+
+    // --- Determine status for admin full-create based on filled data ---
+    let status = 'SUBMITTED_TO_SUPERVISOR';
+    if (isAdminFullCreate) {
+      const hasPE = !!(data.peNo || data.peStatus || data.peRegDate);
+      const allHaveCA = respondentsData.length > 0 &&
+        respondentsData.every(r => r.caDesignation && r.caDepartment && r.caSubDepartment && r.caPlace);
+      const allPermsResolved = respondentsData.length > 0 &&
+        respondentsData.every(r => r.permissionStatus && r.permissionStatus !== 'Pending');
+      const somePerms = respondentsData.some(r => r.permissionStatus && r.permissionStatus !== '');
+      const hasProposalAccepted = data.proposalStatus === 'Accept';
+
+      if (hasPE)                          status = 'PRELIMINARY_ENQUIRY_SUBMITTED';
+      else if (allHaveCA && allPermsResolved) status = '17A_PERMISSION_COMPLETED';
+      else if (allHaveCA && somePerms)    status = '17A_PERMISSION_PENDING';
+      else if (allHaveCA)                 status = 'CA_SUBMITTED';
+      else if (hasProposalAccepted)       status = '17A_ACCEPTED';
+      // else stays 'SUBMITTED_TO_SUPERVISOR'
+    }
 
     const newPetition = await prisma.petition.create({
       data: {
@@ -93,25 +113,50 @@ router.post('/', async (req, res) => {
         petitionNo: data.petitionNo,
         petitionerName: data.petitionerName,
         petitionerAddress: data.petitionerAddress,
-        status: 'SUBMITTED_TO_SUPERVISOR',
+        status,
         createdById: req.user.userId,
         updatedById: req.user.userId,
+
+        // Admin full-create: save proposal + PE fields directly
+        ...(isAdminFullCreate ? {
+          proposalStatus: data.proposalStatus || null,
+          proposalSentDate: data.proposalSentDate ? new Date(data.proposalSentDate) : null,
+          peNo: data.peNo || null,
+          peStatus: data.peStatus || null,
+          peRegDate: data.peRegDate ? new Date(data.peRegDate) : null,
+          peReportSentDate: data.peReportSentDate ? new Date(data.peReportSentDate) : null,
+          sirEo: data.sirEo || null,
+        } : {}),
+
         respondents: {
           create: respondentsData.map(r => ({
             name: r.name,
             designation: r.designation,
             office: r.office,
             department: r.department,
-            subDepartment: r.subDepartment
+            subDepartment: r.subDepartment,
+            // Admin full-create: include CA and permission fields per respondent
+            ...(isAdminFullCreate ? {
+              caDesignation: r.caDesignation || null,
+              caDepartment: r.caDepartment || null,
+              caSubDepartment: r.caSubDepartment || null,
+              caPlace: r.caPlace || null,
+              permissionStatus: r.permissionStatus || null,
+              permissionSentDate: r.permissionSentDate ? new Date(r.permissionSentDate) : null,
+              permissionReceivedFromCA: r.permissionReceivedFromCA ? new Date(r.permissionReceivedFromCA) : null,
+              caSentToUnit: r.caSentToUnit ? new Date(r.caSentToUnit) : null,
+            } : {})
           }))
         },
         history: {
           create: {
             fromStatus: 'DRAFT',
-            toStatus: 'SUBMITTED_TO_SUPERVISOR',
-            action: 'CREATE_SUBMIT',
+            toStatus: status,
+            action: isAdminFullCreate ? 'ADMIN_CREATE_FULL' : 'CREATE_SUBMIT',
             actionById: req.user.userId,
-            remarks: 'Petition initially submitted to supervisor'
+            remarks: isAdminFullCreate
+              ? 'Petition created by admin with full details'
+              : 'Petition initially submitted to supervisor'
           }
         }
       },
