@@ -3,8 +3,8 @@ import { NavLink } from 'react-router-dom';
 
 export default function SidebarMenuItem({ icon: Icon, label, path, end, collapsed, onLinkClick, onClick, active }) {
   const baseClass = 'flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-[13.5px] font-medium transition-colors duration-150 w-full';
-  const inactiveClass = 'text-[#C9CEDA] hover:bg-white/5 hover:text-[#F5EFE1]';
-  const activeClass = 'bg-brass/20 text-brass-light';
+  const inactiveClass = 'text-[#DCE4FA] hover:bg-white/15 hover:text-white';
+  const activeClass = 'bg-white/20 text-white font-bold shadow-sm border-r-4 border-yellow-300';
 
   const content = (
     <>

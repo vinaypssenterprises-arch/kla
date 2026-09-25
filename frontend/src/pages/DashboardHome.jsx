@@ -1,13 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
 import { apiFetch } from '../lib/api';
 import { 
   Shield, 
   RotateCw, 
   Filter, 
   Printer, 
-  PlusCircle, 
-  UserPlus, 
   Calendar,
   Layers,
   Sparkles,
@@ -92,8 +89,8 @@ export default function DashboardHome() {
           
           {/* Title & Organization Info */}
           <div className="flex items-start gap-3.5">
-            <div className="w-12 h-12 rounded-xl bg-ink flex-shrink-0 flex items-center justify-center shadow-md border border-brass/40">
-              <Shield className="w-6 h-6 text-[#C9A15E]" />
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#0000FE] to-[#0000C8] flex-shrink-0 flex items-center justify-center shadow-md border border-yellow-300/60">
+              <Shield className="w-6 h-6 text-yellow-300" />
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
@@ -105,11 +102,8 @@ export default function DashboardHome() {
                 </span>
               </div>
               <h1 className="text-xl sm:text-2xl font-serif font-bold text-ink-text mt-1 leading-tight">
-                Executive Oversight & Enforcement Dashboard
+                Enforcement Dashboard
               </h1>
-              <p className="text-xs text-ink-text-soft mt-0.5">
-                Real-time legal compliance, Competent Authority (CA) sanctions, and statutory preliminary enquiry tracking.
-              </p>
             </div>
           </div>
 
@@ -140,22 +134,6 @@ export default function DashboardHome() {
               <Printer className="w-3.5 h-3.5 text-ink-text-soft" />
               <span className="hidden sm:inline">Print Brief</span>
             </button>
-
-            <Link
-              to="/register/new"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-ink text-[#F5EFE1] hover:bg-[#1c2840] transition-all shadow-sm border border-white/10"
-            >
-              <PlusCircle className="w-3.5 h-3.5 text-[#C9A15E]" />
-              <span>+ New Petition</span>
-            </Link>
-
-            <Link
-              to="/officers/new"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-maroon text-white hover:bg-maroon-dark transition-all shadow-sm"
-            >
-              <UserPlus className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">+ Register Officer</span>
-            </Link>
           </div>
         </div>
 
@@ -204,7 +182,7 @@ export default function DashboardHome() {
                 onClick={() => setTimeframe(t.id)}
                 className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-all ${
                   timeframe === t.id
-                    ? 'bg-ink text-[#F5EFE1] shadow-xs'
+                    ? 'bg-[#0000FE] text-white font-bold shadow-xs'
                     : 'text-ink-text-soft hover:text-ink-text hover:bg-parchment-2/50'
                 }`}
               >

@@ -20,8 +20,9 @@ const getIncludeOpts = () => ({
 // Get all petitions — server-side pagination + search for 1200-officer scale
 router.get('/', async (req, res) => {
   try {
+    const isAll = req.query.all === 'true';
     const page = Math.max(parseInt(req.query.page) || 1, 1);
-    const pageSize = Math.min(Math.max(parseInt(req.query.pageSize) || 25, 1), 100);
+    const pageSize = isAll ? undefined : Math.min(Math.max(parseInt(req.query.pageSize) || 25, 1), 100);
     const search = (req.query.search || '').trim();
     const districtFilter = req.query.district || '';
     const statusFilter = req.query.status || '';
@@ -44,13 +45,15 @@ router.get('/', async (req, res) => {
           { petitionNo: { contains: search, mode: 'insensitive' } },
           { petitionerName: { contains: search, mode: 'insensitive' } },
           { district: { contains: search, mode: 'insensitive' } },
+          { sirOfficerName: { contains: search, mode: 'insensitive' } },
+          { officerRank: { contains: search, mode: 'insensitive' } },
           { respondents: { some: { name: { contains: search, mode: 'insensitive' } } } }
         ]
       } : {})
     };
 
     // Try cache only for admin with no filters (most expensive query)
-    const isUnfiltered = req.user.role === 'admin' && !search && !districtFilter && !statusFilter && page === 1;
+    const isUnfiltered = req.user.role === 'admin' && !search && !districtFilter && !statusFilter && page === 1 && !isAll;
     const cacheKey = `petitions:p${page}:ps${pageSize}`;
     if (isUnfiltered) {
       const cached = await redisClient.get(cacheKey);
@@ -62,13 +65,21 @@ router.get('/', async (req, res) => {
         where,
         include: getIncludeOpts(),
         orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * pageSize,
-        take: pageSize
+        ...(isAll ? {} : {
+          skip: (page - 1) * pageSize,
+          take: pageSize
+        })
       }),
       prisma.petition.count({ where })
     ]);
 
-    const result = { data: petitions, total, page, pageSize, totalPages: Math.ceil(total / pageSize) };
+    const result = {
+      data: petitions,
+      total,
+      page: isAll ? 1 : page,
+      pageSize: isAll ? total : pageSize,
+      totalPages: isAll ? 1 : Math.ceil(total / (pageSize || 25))
+    };
 
     if (isUnfiltered) {
       await redisClient.setEx(cacheKey, 30, JSON.stringify(result));
@@ -112,7 +123,9 @@ router.post('/', async (req, res) => {
         district: data.district,
         petitionNo: data.petitionNo,
         petitionerName: data.petitionerName,
-        petitionerAddress: data.petitionerAddress,
+        petitionerAddress: data.petitionerAddress || null,
+        sirOfficerName: data.sirOfficerName || null,
+        officerRank: data.officerRank || null,
         status,
         createdById: req.user.userId,
         updatedById: req.user.userId,
@@ -239,7 +252,9 @@ router.post('/:id/action', async (req, res) => {
           district: payload.district,
           petitionNo: payload.petitionNo,
           petitionerName: payload.petitionerName,
-          petitionerAddress: payload.petitionerAddress,
+          petitionerAddress: payload.petitionerAddress || null,
+          sirOfficerName: payload.sirOfficerName || null,
+          officerRank: payload.officerRank || null,
           status: nextStatus,
           updatedById: req.user.userId,
           proposalStatus: null, // clear previous return status
@@ -383,6 +398,142 @@ router.post('/:id/action', async (req, res) => {
   } catch (error) {
     console.error('Petition action error:', error);
     res.status(500).json({ error: 'Failed to process action' });
+  }
+});
+
+// Admin full edit of an existing petition — update all fields across all sections
+router.put('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Only admins can perform full edit' });
+    }
+
+    const petition = await prisma.petition.findUnique({
+      where: { id },
+      include: { respondents: true }
+    });
+    if (!petition) {
+      return res.status(404).json({ error: 'Petition not found' });
+    }
+
+    const data = req.body;
+    const respondentsData = data.respondents || [];
+
+    if (!data.district || !data.petitionNo || !data.petitionerName) {
+      return res.status(400).json({ error: 'District, Petition No, and Petitioner Name are required' });
+    }
+    if (respondentsData.length === 0) {
+      return res.status(400).json({ error: 'At least one respondent is required' });
+    }
+
+    // Check if petitionNo is duplicate with another petition
+    if (data.petitionNo !== petition.petitionNo) {
+      const duplicate = await prisma.petition.findUnique({
+        where: { petitionNo: data.petitionNo }
+      });
+      if (duplicate && duplicate.id !== id) {
+        return res.status(400).json({ error: `Petition No "${data.petitionNo}" already exists` });
+      }
+    }
+
+    const nextStatus = data.status || petition.status;
+
+    await prisma.$transaction(async (tx) => {
+      // 1. Delete respondents that are no longer in submitted list
+      const submittedIds = respondentsData.filter(r => r.id).map(r => r.id);
+      await tx.respondent.deleteMany({
+        where: {
+          petitionId: id,
+          id: { notIn: submittedIds }
+        }
+      });
+
+      // 2. Update or create respondents
+      for (const r of respondentsData) {
+        const respondentPayload = {
+          name: r.name,
+          designation: r.designation || null,
+          office: r.office || null,
+          department: r.department || null,
+          subDepartment: r.subDepartment || null,
+          caDesignation: r.caDesignation || null,
+          caDepartment: r.caDepartment || null,
+          caSubDepartment: r.caSubDepartment || null,
+          caPlace: r.caPlace || null,
+          permissionStatus: r.permissionStatus || null,
+          permissionSentDate: r.permissionSentDate ? new Date(r.permissionSentDate) : null,
+          permissionReceivedFromCA: r.permissionReceivedFromCA ? new Date(r.permissionReceivedFromCA) : null,
+          caSentToUnit: r.caSentToUnit ? new Date(r.caSentToUnit) : null
+        };
+
+        if (r.id && petition.respondents.some(pr => pr.id === r.id)) {
+          await tx.respondent.update({
+            where: { id: r.id },
+            data: respondentPayload
+          });
+        } else {
+          await tx.respondent.create({
+            data: {
+              ...respondentPayload,
+              petitionId: id
+            }
+          });
+        }
+      }
+
+      // 3. Update the petition record
+      await tx.petition.update({
+        where: { id },
+        data: {
+          district: data.district,
+          petitionNo: data.petitionNo,
+          petitionerName: data.petitionerName,
+          petitionerAddress: data.petitionerAddress || null,
+          sirOfficerName: data.sirOfficerName || null,
+          officerRank: data.officerRank || null,
+          proposalStatus: data.proposalStatus || null,
+          proposalSentDate: data.proposalSentDate ? new Date(data.proposalSentDate) : null,
+          peNo: data.peNo || null,
+          peStatus: data.peStatus || null,
+          peRegDate: data.peRegDate ? new Date(data.peRegDate) : null,
+          peReportSentDate: data.peReportSentDate ? new Date(data.peReportSentDate) : null,
+          sirEo: data.sirEo || null,
+          status: nextStatus,
+          updatedById: req.user.userId
+        }
+      });
+
+      // 4. Record History
+      await tx.petitionHistory.create({
+        data: {
+          petitionId: id,
+          fromStatus: petition.status,
+          toStatus: nextStatus,
+          action: 'ADMIN_UPDATE',
+          actionById: req.user.userId,
+          remarks: 'Petition updated by administrator'
+        }
+      });
+    });
+
+    try {
+      const keys = await redisClient.keys('petitions:*');
+      if (keys.length > 0) await redisClient.del(keys);
+    } catch (e) {
+      await redisClient.del('petitions:all');
+      await redisClient.del('petitions:stats');
+    }
+
+    const updated = await prisma.petition.findUnique({
+      where: { id },
+      include: getIncludeOpts()
+    });
+
+    res.json(updated);
+  } catch (error) {
+    console.error('Admin edit petition error:', error);
+    res.status(500).json({ error: error.message || 'Failed to update petition' });
   }
 });
 

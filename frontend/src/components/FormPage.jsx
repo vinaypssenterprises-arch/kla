@@ -81,6 +81,7 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments 
   const isSupervisor = isEdit ? initialData.createdBy?.supervisorUserId === currentUserId : false;
   const isAdmin = localStorage.getItem('role') === 'admin';
   const isAdminNewPetition = isAdmin && !isEdit;
+  const isAdminEdit = isAdmin && isEdit;
 
   const { register, control, watch, setValue, getValues, formState: { isSubmitting } } = useForm({
     defaultValues: isEdit ? {
@@ -88,6 +89,9 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments 
       petitionNo: initialData.petitionNo || '',
       petitionerName: initialData.petitionerName || '',
       petitionerAddress: initialData.petitionerAddress || '',
+      sirOfficerName: initialData.sirOfficerName || '',
+      officerRank: initialData.officerRank || '',
+      status: initialData.status || 'DRAFT',
       respondents: (initialData.respondents || []).map(r => ({
         id: r.id, name: r.name || '', designation: r.designation || '', office: r.office || '', department: r.department || '', subDepartment: r.subDepartment || '',
         caDesignation: r.caDesignation || '', caDepartment: r.caDepartment || '', caSubDepartment: r.caSubDepartment || '', caPlace: r.caPlace || '',
@@ -103,7 +107,7 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments 
       sirEo: initialData.sirEo || '',
     } : {
       district: isAdminNewPetition ? '' : (localStorage.getItem('isHeadOffice') !== '1' ? (localStorage.getItem('districtName') || '') : ''), 
-      petitionNo: '', petitionerName: '', petitionerAddress: '', respondents: [], sirEo: '',
+      petitionNo: '', petitionerName: '', petitionerAddress: '', sirOfficerName: '', officerRank: '', status: 'DRAFT', respondents: [], sirEo: '',
       proposalStatus: '', proposalSentDate: '',
       peNo: '', peRegDate: '', peReportSentDate: '', peStatus: '',
     }
@@ -147,7 +151,7 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments 
     const token = localStorage.getItem('token');
     
     // Validation before specific actions
-    if (actionType === 'CREATE_SUBMIT' || actionType === 'RESUBMIT' || actionType === 'ADMIN_CREATE_FULL') {
+    if (actionType === 'CREATE_SUBMIT' || actionType === 'RESUBMIT' || actionType === 'ADMIN_CREATE_FULL' || actionType === 'ADMIN_UPDATE') {
       if (!data.district || !data.petitionNo || !data.petitionerName) return setErrorMsg('Petition Details are required.');
       if (data.respondents.length === 0) return setErrorMsg('At least one respondent is required.');
     }
@@ -159,7 +163,19 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments 
     }
 
     try {
-      if (actionType === 'ADMIN_CREATE_FULL') {
+      if (actionType === 'ADMIN_UPDATE') {
+        const res = await apiFetch(`/petitions/${initialData.id}`, {
+          method: 'PUT',
+          body: JSON.stringify(data)
+        });
+        if (res.ok) {
+          showSuccess('Petition updated successfully.');
+          navigate('/register');
+        } else {
+          const e = await res.json();
+          setErrorMsg(e.error || 'Failed to update petition');
+        }
+      } else if (actionType === 'ADMIN_CREATE_FULL') {
         const res = await apiFetch(`/petitions`, {
           method: 'POST',
           body: JSON.stringify({ ...data, adminFullCreate: true })
@@ -173,6 +189,7 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments 
           method: 'POST',
           body: JSON.stringify({
             district: data.district, petitionNo: data.petitionNo, petitionerName: data.petitionerName, petitionerAddress: data.petitionerAddress,
+            sirOfficerName: data.sirOfficerName, officerRank: data.officerRank,
             respondents: data.respondents
           })
         });
@@ -199,19 +216,19 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments 
   };
 
   // Section Visibilities and Editability
-  // isAdminNewPetition: admin creating new petition → all sections visible & editable in one form
-  const canEditIandII = isAdminNewPetition || status === 'DRAFT' || (status === '17A_RETURNED' && isCreator);
-  const showIII = isAdminNewPetition || (status !== 'DRAFT' && status !== '17A_RETURNED');
-  const canEditIII = (status === 'SUBMITTED_TO_SUPERVISOR') && (isSupervisor || isAdmin);
+  // If admin: all sections I through VI are visible and editable at all times
+  const canEditIandII = isAdmin || status === 'DRAFT' || (status === '17A_RETURNED' && isCreator);
+  const showIII = isAdmin || (status !== 'DRAFT' && status !== '17A_RETURNED');
+  const canEditIII = isAdmin || ((status === 'SUBMITTED_TO_SUPERVISOR') && isSupervisor);
 
-  const showIV = isAdminNewPetition || ['17A_ACCEPTED', 'CA_SUBMITTED', '17A_PERMISSION_PENDING', '17A_PERMISSION_COMPLETED', 'PRELIMINARY_ENQUIRY_SUBMITTED'].includes(status);
-  const canEditIV = isAdminNewPetition || ((status === '17A_ACCEPTED') && (isSupervisor || isAdmin));
+  const showIV = isAdmin || ['17A_ACCEPTED', 'CA_SUBMITTED', '17A_PERMISSION_PENDING', '17A_PERMISSION_COMPLETED', 'PRELIMINARY_ENQUIRY_SUBMITTED'].includes(status);
+  const canEditIV = isAdmin || ((status === '17A_ACCEPTED') && isSupervisor);
 
-  const showV = isAdminNewPetition || ['CA_SUBMITTED', '17A_PERMISSION_PENDING', '17A_PERMISSION_COMPLETED', 'PRELIMINARY_ENQUIRY_SUBMITTED'].includes(status);
-  const canEditV = isAdminNewPetition || ((status === 'CA_SUBMITTED' || status === '17A_PERMISSION_PENDING') && (isSupervisor || isAdmin));
+  const showV = isAdmin || ['CA_SUBMITTED', '17A_PERMISSION_PENDING', '17A_PERMISSION_COMPLETED', 'PRELIMINARY_ENQUIRY_SUBMITTED'].includes(status);
+  const canEditV = isAdmin || ((status === 'CA_SUBMITTED' || status === '17A_PERMISSION_PENDING') && isSupervisor);
 
-  const showVI = isAdminNewPetition || ['17A_PERMISSION_COMPLETED', 'PRELIMINARY_ENQUIRY_SUBMITTED'].includes(status);
-  const canEditVI = isAdminNewPetition || ((status === '17A_PERMISSION_COMPLETED') && (isCreator || isAdmin));
+  const showVI = isAdmin || ['17A_PERMISSION_COMPLETED', 'PRELIMINARY_ENQUIRY_SUBMITTED'].includes(status);
+  const canEditVI = isAdmin || ((status === '17A_PERMISSION_COMPLETED') && isCreator);
 
   return (
     <div>
@@ -221,11 +238,24 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments 
           <div className="flex items-center gap-2 mt-1">
             <span className="stamp stamp-neutral">{status.replace(/_/g, ' ')}</span>
             {isEdit && <span className="text-[12px] text-ink-text-faint">Created by {initialData.createdBy?.fullName || 'User'}</span>}
+            {isAdminEdit && <span className="stamp stamp-warning font-semibold">Admin Edit Mode</span>}
           </div>
         </div>
-        <button type="button" className="btn btn-secondary" onClick={() => navigate('/register')}>
-          <ArrowLeft className="w-[15px] h-[15px]" /> Back
-        </button>
+        <div className="flex items-center gap-2.5">
+          <button type="button" className="btn btn-secondary" onClick={() => navigate('/register')}>
+            <ArrowLeft className="w-[15px] h-[15px]" /> Back
+          </button>
+          {isAdminEdit && (
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => doAction('ADMIN_UPDATE')}
+              disabled={isSubmitting}
+            >
+              <Save className="w-4 h-4" /> Save Changes
+            </button>
+          )}
+        </div>
       </div>
 
       {errorMsg && (
@@ -270,6 +300,29 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments 
               <label className="text-[12.5px] font-semibold text-ink-text-soft">Address of the Petitioner</label>
               <input type="text" className="app-input" {...register('petitionerAddress')} disabled={!canEditIandII} />
             </div>
+            <div className="flex flex-col gap-1.5 sm:col-span-1">
+              <label className="text-[12.5px] font-semibold text-ink-text-soft">SIR Officer Name</label>
+              <input type="text" className="app-input" placeholder="Officer name" {...register('sirOfficerName')} disabled={!canEditIandII} />
+            </div>
+            <div className="flex flex-col gap-1.5 sm:col-span-1">
+              <label className="text-[12.5px] font-semibold text-ink-text-soft">Officer Rank</label>
+              <input type="text" className="app-input" placeholder="e.g. SP, DySP, Inspector" {...register('officerRank')} disabled={!canEditIandII} />
+            </div>
+            {isAdmin && (
+              <div className="flex flex-col gap-1.5 sm:col-span-2">
+                <label className="text-[12.5px] font-semibold text-ink-text-soft">Workflow Status</label>
+                <select className="app-input font-medium" {...register('status')}>
+                  <option value="DRAFT">DRAFT</option>
+                  <option value="SUBMITTED_TO_SUPERVISOR">SUBMITTED TO SUPERVISOR</option>
+                  <option value="17A_RETURNED">17A RETURNED</option>
+                  <option value="17A_ACCEPTED">17A ACCEPTED</option>
+                  <option value="CA_SUBMITTED">CA SUBMITTED</option>
+                  <option value="17A_PERMISSION_PENDING">17A PERMISSION PENDING</option>
+                  <option value="17A_PERMISSION_COMPLETED">17A PERMISSION COMPLETED</option>
+                  <option value="PRELIMINARY_ENQUIRY_SUBMITTED">PRELIMINARY ENQUIRY SUBMITTED</option>
+                </select>
+              </div>
+            )}
           </div>
         </div>
 
@@ -298,13 +351,70 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments 
                     {respondentFields.map((field, index) => (
                       <tr key={field.id}>
                         <td className="font-mono text-ink-text-faint">{index + 1}</td>
-                        <td>
-                          <div className="font-semibold text-ink-text whitespace-nowrap">{field.name}</div>
-                          {field.designation && <div className="text-[11.5px] text-ink-text-soft whitespace-nowrap">{field.designation}</div>}
-                        </td>
-                        <td className="max-w-[160px]"><span className="block truncate" title={field.office}>{field.office || '—'}</span></td>
-                        <td className="max-w-[200px]"><span className="block truncate" title={field.department}>{field.department || '—'}</span></td>
-                        <td className="max-w-[240px]"><span className="block truncate" title={field.subDepartment}>{field.subDepartment || '—'}</span></td>
+                        {isAdmin ? (
+                          <>
+                            <td>
+                              <input
+                                type="text"
+                                className="app-input py-1 px-2 text-[12.5px] min-w-[130px]"
+                                placeholder="Name"
+                                {...register(`respondents.${index}.name`)}
+                              />
+                              <input
+                                type="text"
+                                className="app-input py-1 px-2 text-[11.5px] mt-1 min-w-[130px]"
+                                placeholder="Designation"
+                                {...register(`respondents.${index}.designation`)}
+                              />
+                            </td>
+                            <td>
+                              <input
+                                type="text"
+                                className="app-input py-1 px-2 text-[12.5px] min-w-[120px]"
+                                placeholder="Office"
+                                {...register(`respondents.${index}.office`)}
+                              />
+                            </td>
+                            <td className="min-w-[180px]">
+                              <Controller
+                                name={`respondents.${index}.department`}
+                                control={control}
+                                render={({ field: f }) => (
+                                  <SearchableSelect
+                                    value={f.value}
+                                    onChange={(v) => { f.onChange(v); setValue(`respondents.${index}.subDepartment`, ''); }}
+                                    options={withLegacyOption(departmentOptions, initialData?.respondents?.[index]?.department)}
+                                    placeholder="Select Dept"
+                                  />
+                                )}
+                              />
+                            </td>
+                            <td className="min-w-[180px]">
+                              <Controller
+                                name={`respondents.${index}.subDepartment`}
+                                control={control}
+                                render={({ field: f }) => (
+                                  <SearchableSelect
+                                    value={f.value}
+                                    onChange={f.onChange}
+                                    options={withLegacyOption(getSubDeptOptions(currentRespondents?.[index]?.department), initialData?.respondents?.[index]?.subDepartment)}
+                                    placeholder="Select Sub Dept"
+                                  />
+                                )}
+                              />
+                            </td>
+                          </>
+                        ) : (
+                          <>
+                            <td>
+                              <div className="font-semibold text-ink-text whitespace-nowrap">{field.name}</div>
+                              {field.designation && <div className="text-[11.5px] text-ink-text-soft whitespace-nowrap">{field.designation}</div>}
+                            </td>
+                            <td className="max-w-[160px]"><span className="block truncate" title={field.office}>{field.office || '—'}</span></td>
+                            <td className="max-w-[200px]"><span className="block truncate" title={field.department}>{field.department || '—'}</span></td>
+                            <td className="max-w-[240px]"><span className="block truncate" title={field.subDepartment}>{field.subDepartment || '—'}</span></td>
+                          </>
+                        )}
                         {canEditIandII && (
                           <td>
                             <button type="button" className="icon-btn hover:!bg-brick-bg hover:!text-brick" title="Remove respondent" onClick={() => removeRespondent(index)}>
@@ -369,8 +479,8 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments 
             <h4 className="text-[15px] text-ink-text mb-[18px] font-serif font-semibold flex items-baseline gap-2">
               <span className="font-mono text-[13px] text-brass font-semibold">III.</span> 17-A Proposal
             </h4>
-            {isAdminNewPetition ? (
-              /* Admin creating new petition: simple data-entry (no action buttons) */
+            {isAdmin ? (
+              /* Admin: direct data-entry & edit in all states */
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
                 <div className="flex flex-col gap-1.5">
                   <label className="text-[12.5px] font-semibold text-ink-text-soft">Proposal Status</label>
@@ -378,6 +488,7 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments 
                     <option value="">Select status</option>
                     <option value="Accept">Accept</option>
                     <option value="Pending">Pending</option>
+                    <option value="Returned with remarks">Returned with remarks</option>
                   </select>
                 </div>
                 <div className="flex flex-col gap-1.5">
@@ -477,7 +588,7 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments 
                 </div>
               </div>
             ))}
-            {canEditIV && !isAdminNewPetition && (
+            {canEditIV && !isAdmin && (
               <div className="mt-4 flex justify-end">
                 <button type="button" className="btn btn-primary" onClick={() => doAction('SUBMIT_CA')} disabled={isSubmitting}>
                   <Save className="w-4 h-4" /> Submit Competent Authority
@@ -523,7 +634,7 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments 
                 </div>
               ))}
             </div>
-            {canEditV && !isAdminNewPetition && (
+            {canEditV && !isAdmin && (
               <div className="mt-4 flex justify-end">
                 <button type="button" className="btn btn-primary" onClick={() => doAction('SUBMIT_PERMISSION')} disabled={isSubmitting}>
                   <Save className="w-4 h-4" /> Save Permissions
@@ -566,7 +677,7 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments 
                 <input type="text" className="app-input" {...register('sirEo')} disabled={!canEditVI} />
               </div>
             </div>
-            {canEditVI && !isAdminNewPetition && (
+            {canEditVI && !isAdmin && (
               <div className="mt-5 flex justify-end">
                 <button type="button" className="btn btn-primary" onClick={() => doAction('SUBMIT_PE')} disabled={isSubmitting}>
                   <Save className="w-4 h-4" /> Submit Preliminary Enquiry
@@ -605,23 +716,23 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments 
         </div>
       )}
 
-      {/* Bottom Actions for Draft/Return — sticky within the content column so it always
-          lines up with the sidebar's current width/collapsed state instead of a hardcoded pixel offset */}
-      {(isAdminNewPetition || status === 'DRAFT' || status === '17A_RETURNED') && canEditIandII && (
+      {/* Bottom Actions for Admin / Draft / Return */}
+      {(isAdmin || status === 'DRAFT' || status === '17A_RETURNED') && (
         <div className="sticky bottom-0 -mx-5 lg:-mx-7 px-5 lg:px-7 mt-6 bg-[#FFFDF7]/90 backdrop-blur-md border-t border-rule py-4 flex justify-end gap-3 z-40">
           <button type="button" className="btn btn-secondary" onClick={() => navigate('/register')}>Cancel</button>
           <button
             type="button"
             className="btn btn-primary"
             onClick={() => doAction(
-              isAdminNewPetition ? 'ADMIN_CREATE_FULL'
+              isAdminEdit ? 'ADMIN_UPDATE'
+              : isAdminNewPetition ? 'ADMIN_CREATE_FULL'
               : status === 'DRAFT' ? 'CREATE_SUBMIT'
               : 'RESUBMIT'
             )}
             disabled={isSubmitting}
           >
             <Save className="w-4 h-4" />
-            {isAdminNewPetition ? 'Create Petition' : status === 'DRAFT' ? 'Submit to Supervisor' : 'Resubmit Petition'}
+            {isAdminEdit ? 'Save Changes' : isAdminNewPetition ? 'Create Petition' : status === 'DRAFT' ? 'Submit to Supervisor' : 'Resubmit Petition'}
           </button>
         </div>
       )}

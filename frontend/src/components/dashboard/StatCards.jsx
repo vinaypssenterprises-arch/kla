@@ -5,9 +5,7 @@ import {
   CheckCircle2, 
   ShieldCheck, 
   Gavel, 
-  Users2, 
   AlertTriangle, 
-  TrendingUp,
   Clock
 } from 'lucide-react';
 
@@ -17,12 +15,10 @@ export default function StatCards({ overview = {}, onFilterPendingCa }) {
     acceptedProposals = 0,
     permissionsObtained = 0,
     firRegistered = 0,
-    totalOfficers = 0,
     acceptanceRate = 0,
     permissionRate = 0,
     firRate = 0,
     criticalPendingCount = 0,
-    warningPendingCount = 0,
     totalPendingCa = 0
   } = overview;
 
@@ -31,84 +27,66 @@ export default function StatCards({ overview = {}, onFilterPendingCa }) {
       id: 'petitions',
       label: 'Total Petitions Registered',
       value: totalPetitions,
-      subtext: 'Across all jurisdiction units',
       icon: FileText,
-      accent: '#3B82F6',
+      accent: '#60A5FA',
       badge: 'Active Registry',
-      badgeColor: 'bg-blue-500/15 text-blue-300 border-blue-500/30',
+      badgeColor: 'bg-white/20 text-white border-white/30',
       to: '/register'
     },
     {
       id: 'proposals',
       label: '17-A Proposals Accepted',
       value: acceptedProposals,
-      subtext: `${acceptanceRate}% Scrutiny Acceptance Rate`,
       icon: CheckCircle2,
-      accent: '#10B981',
+      accent: '#34D399',
       badge: `${acceptanceRate}% Accepted`,
-      badgeColor: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
-      progressBar: { value: acceptanceRate, color: 'bg-emerald-500' },
+      badgeColor: 'bg-emerald-400/25 text-white border-emerald-300/40',
+      progressBar: { value: acceptanceRate, color: 'bg-emerald-400' },
       to: '/register'
     },
     {
       id: 'permissions',
       label: 'CA Sanctions Obtained',
       value: permissionsObtained,
-      subtext: `${permissionRate}% Sanction Rate (Sec. 17-A)`,
       icon: ShieldCheck,
-      accent: '#C9A15E',
+      accent: '#FBBF24',
       badge: 'Statutory Approved',
-      badgeColor: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
-      progressBar: { value: permissionRate, color: 'bg-[#C9A15E]' },
+      badgeColor: 'bg-amber-400/25 text-white border-amber-300/40',
+      progressBar: { value: permissionRate, color: 'bg-amber-400' },
       to: '/register'
     },
     {
       id: 'firs',
       label: 'FIRs Registered',
       value: firRegistered,
-      subtext: `${firRate}% Legal Action / Prosecution Rate`,
       icon: Gavel,
-      accent: '#EF4444',
+      accent: '#F87171',
       badge: 'Prosecution Active',
-      badgeColor: 'bg-red-500/15 text-red-300 border-red-500/30',
-      progressBar: { value: firRate, color: 'bg-red-500' },
+      badgeColor: 'bg-red-400/25 text-white border-red-300/40',
+      progressBar: { value: firRate, color: 'bg-red-400' },
       to: '/register'
-    },
-    {
-      id: 'officers',
-      label: 'Vigilance Officers Deployed',
-      value: totalOfficers,
-      subtext: 'Field investigators & SPs active',
-      icon: Users2,
-      accent: '#8B5CF6',
-      badge: 'Field Strength',
-      badgeColor: 'bg-purple-500/15 text-purple-300 border-purple-500/30',
-      to: '/officers'
     },
     {
       id: 'pending-ca',
       label: 'Statutory CA Pending Cases',
       value: totalPendingCa,
-      subtext: criticalPendingCount > 0 
-        ? `${criticalPendingCount} critical (>60d), ${warningPendingCount} warning`
-        : totalPendingCa > 0 ? `${warningPendingCount} awaiting response (>30d)` : 'All statutory requests on track',
       icon: criticalPendingCount > 0 ? AlertTriangle : Clock,
-      accent: criticalPendingCount > 0 ? '#F97316' : '#EAB308',
+      accent: criticalPendingCount > 0 ? '#FB923C' : '#FBBF24',
       badge: criticalPendingCount > 0 ? `${criticalPendingCount} Overdue >60d` : `${totalPendingCa} Under Review`,
       badgeColor: criticalPendingCount > 0 
-        ? 'bg-rose-500/20 text-rose-300 border-rose-500/40 animate-pulse' 
-        : 'bg-amber-500/20 text-amber-300 border-amber-500/30',
+        ? 'bg-rose-500/40 text-white border-rose-300/50 animate-pulse' 
+        : 'bg-amber-400/25 text-white border-amber-300/40',
       onClick: onFilterPendingCa,
       isAction: true
     }
   ];
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
       {cards.map((card) => {
         const Icon = card.icon;
         const CardContent = (
-          <div className="relative overflow-hidden rounded-xl bg-ink p-4 border border-white/10 shadow-card hover:border-[#C9A15E]/50 transition-all duration-300 group hover:-translate-y-1 h-full flex flex-col justify-between">
+          <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-[#0000FE] via-[#0000E6] to-[#0000C8] p-4 border border-blue-300/40 shadow-[0_8px_20px_rgba(0,0,254,0.25)] hover:border-yellow-300 hover:shadow-[0_12px_28px_rgba(0,0,254,0.38)] transition-all duration-300 group hover:-translate-y-1 h-full flex flex-col justify-between">
             {/* Top accent bar */}
             <div 
               className="absolute top-0 left-0 right-0 h-1 transition-all duration-300 group-hover:h-1.5" 
@@ -117,47 +95,44 @@ export default function StatCards({ overview = {}, onFilterPendingCa }) {
 
             {/* Subtle glow in background on hover */}
             <div 
-              className="absolute -right-10 -bottom-10 w-24 h-24 rounded-full opacity-10 blur-xl pointer-events-none transition-opacity duration-300 group-hover:opacity-25"
-              style={{ backgroundColor: card.accent }}
+              className="absolute -right-10 -bottom-10 w-24 h-24 rounded-full opacity-20 blur-xl pointer-events-none transition-opacity duration-300 group-hover:opacity-40" 
+              style={{ backgroundColor: card.accent }} 
             />
 
             {/* Top row: Icon and Badge */}
             <div>
               <div className="flex items-center justify-between gap-2 mb-3">
                 <div 
-                  className="w-9 h-9 rounded-lg flex items-center justify-center border border-white/10 bg-white/5 transition-transform duration-300 group-hover:scale-110"
-                  style={{ color: card.accent }}
+                  className="w-9 h-9 rounded-lg flex items-center justify-center border border-white/25 bg-white/20 backdrop-blur-sm transition-transform duration-300 group-hover:scale-110 shadow-sm"
+                  style={{ color: '#FFFFFF' }}
                 >
                   <Icon className="w-5 h-5" />
                 </div>
-                <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${card.badgeColor} tracking-wide`}>
+                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${card.badgeColor} tracking-wide backdrop-blur-xs`}>
                   {card.badge}
                 </span>
               </div>
 
               {/* Number and Label */}
-              <div className="font-serif text-3xl font-bold text-[#F5EFE1] tracking-tight mb-1">
+              <div className="font-serif text-3xl font-bold text-white tracking-tight mb-1">
                 {card.value}
               </div>
-              <div className="text-[11.5px] font-semibold uppercase tracking-wider text-[#A0B0CB]">
+              <div className="text-[11.5px] font-bold uppercase tracking-wider text-[#E0F2FE]">
                 {card.label}
               </div>
             </div>
 
-            {/* Bottom section: Progress bar or Subtext */}
-            <div className="mt-3 pt-2.5 border-t border-white/5">
-              {card.progressBar && (
-                <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden mb-1.5">
+            {/* Bottom section: Progress bar only */}
+            {card.progressBar && (
+              <div className="mt-3 pt-2.5 border-t border-white/20">
+                <div className="w-full bg-black/25 h-1.5 rounded-full overflow-hidden border border-white/10">
                   <div 
                     className={`h-full rounded-full ${card.progressBar.color} transition-all duration-500`}
                     style={{ width: `${Math.min(100, Math.max(5, card.progressBar.value))}%` }}
                   />
                 </div>
-              )}
-              <div className="text-[11px] text-[#8590A8] truncate flex items-center gap-1 font-sans">
-                {card.subtext}
               </div>
-            </div>
+            )}
           </div>
         );
 

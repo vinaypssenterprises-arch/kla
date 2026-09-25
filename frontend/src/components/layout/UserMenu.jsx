@@ -47,14 +47,14 @@ export default function UserMenu({ collapsed, onLogout }) {
   return (
     <div ref={containerRef} className="relative">
       {open && (
-        <div className="absolute bottom-full left-0 mb-2 w-[230px] bg-ink border border-white/10 rounded-lg shadow-deep py-1.5 z-50 overflow-hidden">
-          <div className="px-3.5 py-3 border-b border-white/10">
-            <div className="text-[13px] font-semibold text-[#F5EFE1] truncate">{displayName}</div>
-            <div className="text-[11.5px] text-[#8590A8] truncate">{email}</div>
+        <div className="absolute bottom-full left-0 mb-2 w-[230px] bg-[#000E89] border border-white/20 rounded-lg shadow-deep py-1.5 z-50 overflow-hidden">
+          <div className="px-3.5 py-3 border-b border-white/15">
+            <div className="text-[13px] font-bold text-white truncate">{displayName}</div>
+            <div className="text-[11.5px] text-[#BAC8F5] truncate font-medium">{email}</div>
           </div>
           <button
             type="button"
-            className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-[13px] font-medium text-[#D9CBA3] hover:bg-white/5 transition-colors duration-150"
+            className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-[13px] font-semibold text-yellow-300 hover:bg-white/15 transition-colors duration-150"
             onClick={() => { setOpen(false); setResetOpen(true); }}
           >
             <KeyRound className="w-[16px] h-[16px] flex-shrink-0" />
@@ -62,7 +62,7 @@ export default function UserMenu({ collapsed, onLogout }) {
           </button>
           <button
             type="button"
-            className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-[13px] font-medium text-[#E08585] hover:bg-white/5 transition-colors duration-150"
+            className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-[13px] font-semibold text-rose-300 hover:bg-white/15 transition-colors duration-150"
             onClick={() => { setOpen(false); setConfirmingLogout(true); }}
           >
             <LogOut className="w-[16px] h-[16px] flex-shrink-0" />
@@ -77,21 +77,21 @@ export default function UserMenu({ collapsed, onLogout }) {
         title={collapsed ? displayName : undefined}
         aria-expanded={open}
         aria-haspopup="true"
-        className={`w-full flex items-center gap-3 px-2 py-2 rounded-lg transition-colors duration-150 hover:bg-white/5 ${open ? 'bg-white/5' : ''}`}
+        className={`w-full flex items-center gap-3 px-2 py-2 rounded-lg transition-colors duration-150 hover:bg-white/15 ${open ? 'bg-white/15' : ''}`}
       >
         <div
-          className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 text-[12px] font-bold text-ink"
-          style={{ background: 'radial-gradient(circle at 35% 30%, var(--brass-light), var(--brass) 60%, var(--maroon-dark))' }}
+          className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 text-[12px] font-bold text-[#000E89]"
+          style={{ background: 'radial-gradient(circle at 35% 30%, #FDE68A, #F59E0B 60%, #B45309)' }}
         >
           {initials}
         </div>
         {!collapsed && (
           <>
             <div className="min-w-0 flex-1 text-left">
-              <div className="text-[13px] font-semibold text-[#F5EFE1] truncate">{displayName}</div>
-              <div className="text-[11px] text-brass-light capitalize truncate">{role}</div>
+              <div className="text-[13px] font-bold text-white truncate">{displayName}</div>
+              <div className="text-[11px] text-yellow-300 capitalize truncate font-semibold">{role}</div>
             </div>
-            <ChevronUp className={`w-[14px] h-[14px] text-[#8590A8] flex-shrink-0 transition-transform duration-200 ${open ? '' : 'rotate-180'}`} />
+            <ChevronUp className={`w-[14px] h-[14px] text-[#BAC8F5] flex-shrink-0 transition-transform duration-200 ${open ? '' : 'rotate-180'}`} />
           </>
         )}
       </button>

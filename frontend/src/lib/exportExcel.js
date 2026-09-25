@@ -5,10 +5,16 @@ import { saveAs } from 'file-saver';
 
 const authHeaders = () => ({ 'Authorization': `Bearer ${localStorage.getItem('token')}` });
 
-export async function exportPetitionsToExcel() {
-  const res = await apiFetch(`/petitions`, {  });
+export async function exportPetitionsToExcel({ search = '', district = '', status = '' } = {}) {
+  const params = new URLSearchParams({ all: 'true' });
+  if (search) params.set('search', search);
+  if (district) params.set('district', district);
+  if (status) params.set('status', status);
+
+  const res = await apiFetch(`/petitions?${params.toString()}`);
   if (!res.ok) throw new Error('Failed to fetch petitions');
-  const petitions = await res.json();
+  const resData = await res.json();
+  const petitions = Array.isArray(resData) ? resData : (resData.data || []);
 
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'System Admin';
@@ -52,15 +58,15 @@ export async function exportPetitionsToExcel() {
     }
   });
 
-  // TITLE ROWS
-  sheet.mergeCells('A1:P1');
+  // TITLE ROWS (Across A-S, 19 columns)
+  sheet.mergeCells('A1:S1');
   const title1 = sheet.getCell('A1');
   title1.value = '17-A PROPOSALS & STATUS REGISTER';
   title1.font = { name: 'Aptos', size: 16, bold: true, color: { argb: 'FFFFFFFF' } };
   title1.alignment = { horizontal: 'center', vertical: 'middle' };
   title1.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F4E78' } }; // Dark blue
 
-  sheet.mergeCells('A2:P2');
+  sheet.mergeCells('A2:S2');
   const title2 = sheet.getCell('A2');
   title2.value = 'Petitions Report';
   title2.font = { name: 'Aptos', size: 14, bold: true, color: { argb: 'FF1F4E78' } };
@@ -71,7 +77,7 @@ export async function exportPetitionsToExcel() {
   const dateStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).replace(/ /g, '-');
   const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
 
-  sheet.mergeCells('A3:P3');
+  sheet.mergeCells('A3:S3');
   const title3 = sheet.getCell('A3');
   title3.value = `Generated Date: ${dateStr} ${timeStr}`;
   title3.font = { name: 'Aptos', size: 11, italic: true };
@@ -137,6 +143,9 @@ export async function exportPetitionsToExcel() {
     { header: 'District', key: 'district', width: 18 },
     { header: 'Petition No', key: 'petitionNo', width: 15 },
     { header: 'Petitioner', key: 'petitioner', width: 25 },
+    { header: 'Petitioner Address', key: 'petitionerAddress', width: 28 },
+    { header: 'SIR Officer Name', key: 'sirOfficerName', width: 22 },
+    { header: 'Officer Rank', key: 'officerRank', width: 18 },
     { header: 'Respondent(s)', key: 'respondent', width: 25 },
     { header: 'CA Details (Desig/Dept/Office)', key: 'caDetails', width: 35 },
     { header: 'Permission Status', key: 'permissionStatus', width: 18 },
@@ -166,7 +175,7 @@ export async function exportPetitionsToExcel() {
 
   const rows = [];
   if (petitions.length === 0) {
-    sheet.mergeCells('A8:P8');
+    sheet.mergeCells('A8:S8');
     sheet.getCell('A8').value = 'No petition records available.';
     sheet.getCell('A8').font = { name: 'Aptos', size: 12, italic: true };
     sheet.getCell('A8').alignment = { horizontal: 'center', vertical: 'middle' };
@@ -193,6 +202,9 @@ export async function exportPetitionsToExcel() {
         district: p.district,
         petitionNo: p.petitionNo,
         petitioner: p.petitionerName,
+        petitionerAddress: p.petitionerAddress || '',
+        sirOfficerName: p.sirOfficerName || '',
+        officerRank: p.officerRank || '',
         respondent: (p.respondents || []).map(r => {
           const details = [r.designation, r.office, r.department].filter(Boolean).join(' / ');
           return details ? `${r.name} (${details})` : r.name;

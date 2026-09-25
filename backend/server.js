@@ -32,7 +32,7 @@ const limiter = rateLimit({
 });
 app.use('/api', limiter);
 
-// Core middleware — allow frontend on AWS and local dev
+// Core middleware — allow frontend on AWS, local dev, and LAN network IPs
 const allowedOrigins = [
   'https://lokayukta.duckdns.org',
   'http://lokayukta.duckdns.org',
@@ -41,11 +41,24 @@ const allowedOrigins = [
   'http://13.233.160.230:3000',
   'http://localhost:5173',
   'http://localhost:3000',
+  'http://localhost:5000',
 ];
+
+const isOriginAllowed = (origin) => {
+  if (!origin) return true;
+  if (allowedOrigins.includes(origin)) return true;
+  // Allow localhost & 127.0.0.1 on any port
+  if (/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return true;
+  // Allow local/private network IPv4 ranges (10.x.x.x, 192.168.x.x, 172.16-31.x.x) on any port
+  if (/^http:\/\/(10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3})(:\d+)?$/.test(origin)) return true;
+  // Allow development mode requests
+  if (process.env.NODE_ENV !== 'production') return true;
+  return false;
+};
+
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow requests with no origin (mobile apps, curl, Postman)
-    if (!origin || allowedOrigins.includes(origin)) {
+    if (isOriginAllowed(origin)) {
       callback(null, true);
     } else {
       callback(new Error(`CORS: origin ${origin} not allowed`));

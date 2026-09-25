@@ -168,6 +168,18 @@ router.get('/analytics', async (req, res) => {
     const nowMs = Date.now();
     const caAgingList = [];
 
+    // Department aggregation: count at most once per petition for each department
+    petitions.forEach(p => {
+      const uniqueDepts = new Set(
+        (p.respondents || [])
+          .map(r => (r.department || '').trim())
+          .filter(Boolean)
+      );
+      uniqueDepts.forEach(dept => {
+        departmentCounts[dept] = (departmentCounts[dept] || 0) + 1;
+      });
+    });
+
     allRespondents.forEach(r => {
       const rawStatus = (r.permissionStatus || '').trim().toLowerCase();
       let displayStatus = 'Awaiting Sanction (Pending)';
@@ -181,12 +193,6 @@ router.get('/analytics', async (req, res) => {
         permissionsPending++;
       }
       permissionStatusCounts[displayStatus] = (permissionStatusCounts[displayStatus] || 0) + 1;
-
-      // Department aggregation
-      const dept = (r.department || 'Other / General Administration').trim();
-      if (dept) {
-        departmentCounts[dept] = (departmentCounts[dept] || 0) + 1;
-      }
 
       // Track all respondents in the CA Watchlist / Status Tracker
       const dispatchDate = r.permissionSentDate || r.petition?.proposalSentDate;

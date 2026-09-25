@@ -10,7 +10,7 @@ export default function SidebarSubMenu({ icon: Icon, label, children, collapsed,
         onClick={onToggle}
         title={collapsed ? label : undefined}
         className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-[13.5px] font-medium transition-colors duration-150 ${
-          active ? 'bg-brass/20 text-brass-light' : 'text-[#C9CEDA] hover:bg-white/5 hover:text-[#F5EFE1]'
+          active ? 'bg-white/20 text-white font-bold border-r-4 border-yellow-300' : 'text-[#DCE4FA] hover:bg-white/15 hover:text-white'
         }`}
       >
         <Icon className="w-[18px] h-[18px] flex-shrink-0" />
@@ -22,7 +22,7 @@ export default function SidebarSubMenu({ icon: Icon, label, children, collapsed,
 
       {!collapsed && (
         <div className={`overflow-hidden transition-all duration-200 ${expanded ? 'max-h-[320px] mt-1' : 'max-h-0'}`}>
-          <div className="flex flex-col gap-0.5 pl-[14px] ml-[19px] py-0.5 border-l border-white/10">
+          <div className="flex flex-col gap-0.5 pl-[14px] ml-[19px] py-0.5 border-l border-white/20">
             {children.map(child => (
               <NavLink
                 key={child.path}
@@ -31,7 +31,7 @@ export default function SidebarSubMenu({ icon: Icon, label, children, collapsed,
                 onClick={onLinkClick}
                 className={({ isActive }) =>
                   `px-3 py-2 rounded-md text-[12.5px] transition-colors duration-150 ${
-                    isActive ? 'text-brass-light font-semibold' : 'text-[#9AA5BC] hover:text-[#F5EFE1]'
+                    isActive ? 'text-yellow-300 font-bold bg-white/15' : 'text-[#BAC8F5] hover:text-white hover:bg-white/10 font-medium'
                   }`
                 }
               >

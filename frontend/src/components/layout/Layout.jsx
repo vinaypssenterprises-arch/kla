@@ -29,7 +29,7 @@ export default function Layout({ onLogout }) {
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-40 bg-ink flex flex-col transition-all duration-300 ease-in-out w-[250px]
+        className={`fixed inset-y-0 left-0 z-40 bg-[#000E89] border-r border-[#1B2B99] shadow-[4px_0_24px_rgba(0,14,137,0.35)] flex flex-col transition-all duration-300 ease-in-out w-[250px]
           ${collapsed ? 'lg:w-[76px]' : 'lg:w-[250px]'}
           ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
       >
@@ -39,23 +39,23 @@ export default function Layout({ onLogout }) {
           title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           className="hidden lg:flex absolute top-[33px] -right-3.5 -translate-y-1/2 w-7 h-7 rounded-full items-center justify-center
-            bg-brass text-ink border-2 border-ink shadow-[0_2px_8px_rgba(0,0,0,0.35)]
-            hover:bg-brass-light hover:scale-110 active:scale-95 transition-all duration-200 z-50"
+            bg-yellow-400 text-[#000E89] border-2 border-white shadow-[0_2px_8px_rgba(0,0,0,0.25)]
+            hover:bg-yellow-300 hover:scale-110 active:scale-95 transition-all duration-200 z-50 font-bold"
         >
           {collapsed ? <ChevronRight className="w-[15px] h-[15px]" strokeWidth={2.5} /> : <ChevronLeft className="w-[15px] h-[15px]" strokeWidth={2.5} />}
         </button>
 
-        <div className="flex items-center gap-3 px-4 py-4 border-b border-white/10 flex-shrink-0">
-          <div className="topbar-seal flex-shrink-0">
-            <Shield className="w-[18px] h-[18px] text-ink" />
+        <div className="flex items-center gap-3 px-4 py-4 border-b border-white/20 flex-shrink-0 bg-white/[0.04]">
+          <div className="topbar-seal flex-shrink-0 shadow-sm">
+            <Shield className="w-[18px] h-[18px] text-[#000E89]" />
           </div>
           {!collapsed && (
             <div className="min-w-0">
-              <div className="text-[13px] font-serif font-semibold text-[#F5EFE1] leading-tight truncate">17-A Proposals</div>
-              <div className="text-[9.5px] text-[#8590A8] uppercase tracking-[0.06em] truncate">Status Register</div>
+              <div className="text-[13px] font-serif font-bold text-white leading-tight truncate">17-A Proposals</div>
+              <div className="text-[9.5px] text-[#C4CFF5] uppercase tracking-[0.06em] truncate font-semibold">Status Register</div>
             </div>
           )}
-          <button type="button" className="ml-auto icon-btn-dark lg:hidden flex-shrink-0" onClick={() => setMobileOpen(false)} title="Close menu">
+          <button type="button" className="ml-auto icon-btn-dark lg:hidden flex-shrink-0 text-white" onClick={() => setMobileOpen(false)} title="Close menu">
             <X className="w-[18px] h-[18px]" />
           </button>
         </div>
@@ -66,7 +66,7 @@ export default function Layout({ onLogout }) {
           onLinkClick={() => setMobileOpen(false)}
         />
 
-        <div className="px-3 py-3.5 border-t border-white/10 flex-shrink-0">
+        <div className="px-3 py-3.5 border-t border-white/20 flex-shrink-0 bg-white/[0.05]">
           <UserMenu collapsed={collapsed} onLogout={onLogout} />
         </div>
       </aside>

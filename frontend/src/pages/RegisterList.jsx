@@ -99,7 +99,11 @@ export default function RegisterList() {
 
   const handleExportExcel = async () => {
     try {
-      await exportPetitionsToExcel();
+      await exportPetitionsToExcel({
+        search: debouncedSearch,
+        district: districtFilter,
+        status: statusFilter
+      });
       showSuccess('Petitions exported to Excel successfully.');
     } catch (err) {
       console.error('Export failed', err);
@@ -453,6 +457,8 @@ export default function RegisterList() {
                     { label: 'PE Reg. Date', value: formatDate(viewingEntry.peRegDate) },
                     { label: 'PE Status', value: viewingEntry.peStatus || '—' },
                     { label: 'PE Report Sent', value: formatDate(viewingEntry.peReportSentDate) },
+                    { label: 'SIR Officer Name', value: viewingEntry.sirOfficerName || '—' },
+                    { label: 'Officer Rank', value: viewingEntry.officerRank || '—' },
                     { label: 'Petitioner Address', value: viewingEntry.petitionerAddress || '—', span: 2 },
                   ].map(({ label, value, span }) => (
                     <div key={label} className={span === 2 ? 'col-span-2' : ''}>

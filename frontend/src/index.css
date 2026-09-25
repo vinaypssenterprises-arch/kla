@@ -4,8 +4,8 @@
 
 @layer base {
   :root {
-    --ink: #101826;
-    --ink-2: #1c2840;
+    --ink: #000E89;
+    --ink-2: #0015A8;
     --parchment: #EDEADD;
     --parchment-2: #E3DEC7;
     --parchment-3: #D9D2B4;
@@ -324,6 +324,6 @@
   aside, header, .no-print { display: none !important; }
   main { padding: 0 !important; }
   body { background: white !important; color: black !important; }
-  .bg-ink { background: #1c2840 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .bg-ink { background: #000E89 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
 

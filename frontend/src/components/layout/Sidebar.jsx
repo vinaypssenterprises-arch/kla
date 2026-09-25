@@ -37,8 +37,7 @@ const buildMenu = (isAdmin) => [
       { label: 'Proposal Status', path: '/masters/proposal-status' }
     ]
   }] : []),
-  { type: 'link', key: 'reports', label: 'Reports', icon: BarChart3, path: '/reports' },
-  { type: 'action', key: 'export', label: 'Export Excel', icon: Download }
+  { type: 'link', key: 'reports', label: 'Reports', icon: BarChart3, path: '/reports' }
 ];
 
 export default function Sidebar({ collapsed, onExpandSidebar, onLinkClick }) {
