@@ -142,6 +142,7 @@ export async function exportPetitionsToExcel({ search = '', district = '', statu
     { header: 'Sl No', key: 'sl', width: 8 },
     { header: 'District', key: 'district', width: 18 },
     { header: 'Petition No', key: 'petitionNo', width: 15 },
+    { header: 'Type', key: 'type', width: 15 },
     { header: 'Petitioner', key: 'petitioner', width: 25 },
     { header: 'Petitioner Address', key: 'petitionerAddress', width: 28 },
     { header: 'SIR Officer Name', key: 'sirOfficerName', width: 22 },
@@ -201,6 +202,7 @@ export async function exportPetitionsToExcel({ search = '', district = '', statu
         sl: idx + 1,
         district: p.district,
         petitionNo: p.petitionNo,
+        type: p.type || 'Complaint',
         petitioner: p.petitionerName,
         petitionerAddress: p.petitionerAddress || '',
         sirOfficerName: p.sirOfficerName || '',
@@ -508,5 +510,211 @@ export async function exportOfficersToExcel({ search = '', districtId = '', desi
   const buffer = await workbook.xlsx.writeBuffer();
   const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const fileName = `17-A_Officers_Register_${now.toISOString().slice(0, 10)}.xlsx`;
+  saveAs(blob, fileName);
+}
+
+export async function exportDistrictProposalsStatisticsExcel({ districtStats = [], totals = {}, historicalYears = [], focusYear = 2026 } = {}) {
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = 'Karnataka Lokayukta Police';
+  workbook.created = new Date();
+
+  const sheet = workbook.addWorksheet('17-A Statistics', {
+    pageSetup: {
+      paperSize: 9, // A4
+      orientation: 'landscape',
+      fitToPage: true,
+      fitToWidth: 1,
+      fitToHeight: 0,
+      margins: { left: 0.4, right: 0.4, top: 0.6, bottom: 0.6, header: 0.3, footer: 0.3 }
+    }
+  });
+
+  const borderStyle = {
+    top: { style: 'thin', color: { argb: 'FF000000' } },
+    left: { style: 'thin', color: { argb: 'FF000000' } },
+    bottom: { style: 'thin', color: { argb: 'FF000000' } },
+    right: { style: 'thin', color: { argb: 'FF000000' } }
+  };
+
+  const headerFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2F2F2' } };
+  const totalFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEAECEF' } };
+
+  const numHist = historicalYears.length;
+  const startHistCol = 3; // Column C
+  const endHistCol = startHistCol + numHist - 1;
+  const startFocusCol = endHistCol + 1;
+  const endFocusCol = startFocusCol + 5;
+  const totalCols = endFocusCol;
+
+  // Set Column Widths
+  sheet.getColumn(1).width = 8;
+  sheet.getColumn(2).width = 24;
+  for (let i = 0; i < numHist; i++) {
+    sheet.getColumn(startHistCol + i).width = 8;
+  }
+  sheet.getColumn(startFocusCol).width = 16;
+  sheet.getColumn(startFocusCol + 1).width = 15;
+  sheet.getColumn(startFocusCol + 2).width = 17;
+  sheet.getColumn(startFocusCol + 3).width = 11;
+  sheet.getColumn(startFocusCol + 4).width = 11;
+  sheet.getColumn(startFocusCol + 5).width = 15;
+
+  // Row 1: Merged Group Headers
+  // Merge Sl. No (A1:A2)
+  sheet.mergeCells(1, 1, 2, 1);
+  const cellA1 = sheet.getCell(1, 1);
+  cellA1.value = 'Sl. No';
+  cellA1.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+  cellA1.font = { name: 'Arial', size: 10, bold: true };
+  cellA1.fill = headerFill;
+
+  // Merge Dist (B1:B2)
+  sheet.mergeCells(1, 2, 2, 2);
+  const cellB1 = sheet.getCell(1, 2);
+  cellB1.value = 'Dist';
+  cellB1.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+  cellB1.font = { name: 'Arial', size: 10, bold: true };
+  cellB1.fill = headerFill;
+
+  // Merge "17-A Proposals" (C1 to endHistCol)
+  sheet.mergeCells(1, startHistCol, 1, endHistCol);
+  const cellHistGroup = sheet.getCell(1, startHistCol);
+  cellHistGroup.value = '17-A Proposals';
+  cellHistGroup.alignment = { horizontal: 'center', vertical: 'middle' };
+  cellHistGroup.font = { name: 'Arial', size: 10, bold: true };
+  cellHistGroup.fill = headerFill;
+
+  // Merge Focus Year (e.g. 2026) (startFocusCol to endFocusCol)
+  sheet.mergeCells(1, startFocusCol, 1, endFocusCol);
+  const cellFocusGroup = sheet.getCell(1, startFocusCol);
+  cellFocusGroup.value = `${focusYear}`;
+  cellFocusGroup.alignment = { horizontal: 'center', vertical: 'middle' };
+  cellFocusGroup.font = { name: 'Arial', size: 10, bold: true };
+  cellFocusGroup.fill = headerFill;
+
+  // Row 2: Sub-headers
+  historicalYears.forEach((y, i) => {
+    const cell = sheet.getCell(2, startHistCol + i);
+    cell.value = y;
+    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+    cell.font = { name: 'Arial', size: 10, bold: true };
+    cell.fill = headerFill;
+  });
+
+  const focusHeaders = [
+    'Total Proposals Received at HQ',
+    'Proposals Sent to CA',
+    'Proposals sent back to Dist',
+    'Obtained',
+    'Rejected',
+    'Pending with CA'
+  ];
+
+  focusHeaders.forEach((title, i) => {
+    const cell = sheet.getCell(2, startFocusCol + i);
+    cell.value = title;
+    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+    cell.font = { name: 'Arial', size: 10, bold: true };
+    cell.fill = headerFill;
+  });
+
+  sheet.getRow(1).height = 24;
+  sheet.getRow(2).height = 42;
+
+  // Apply borders to header cells
+  for (let r = 1; r <= 2; r++) {
+    for (let c = 1; c <= totalCols; c++) {
+      sheet.getCell(r, c).border = borderStyle;
+    }
+  }
+
+  // Row 3 onwards: Data rows
+  let curRow = 3;
+  districtStats.forEach(d => {
+    sheet.getCell(curRow, 1).value = d.slNo;
+    sheet.getCell(curRow, 1).alignment = { horizontal: 'center', vertical: 'middle' };
+
+    sheet.getCell(curRow, 2).value = d.district;
+    sheet.getCell(curRow, 2).alignment = { horizontal: 'left', vertical: 'middle' };
+
+    historicalYears.forEach((y, i) => {
+      const val = d.historical ? (d.historical[y] || 0) : 0;
+      const cell = sheet.getCell(curRow, startHistCol + i);
+      cell.value = val === 0 ? '' : val;
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+    });
+
+    const fVals = [
+      d.totalReceivedAtHq,
+      d.proposalsSentToCA,
+      d.proposalsSentBackToDist,
+      d.obtained,
+      d.rejected,
+      d.pendingWithCA
+    ];
+
+    fVals.forEach((val, i) => {
+      const cell = sheet.getCell(curRow, startFocusCol + i);
+      cell.value = (val === 0 || val == null) ? '' : val;
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+    });
+
+    for (let c = 1; c <= totalCols; c++) {
+      const cell = sheet.getCell(curRow, c);
+      cell.border = borderStyle;
+      cell.font = { name: 'Arial', size: 9.5 };
+    }
+
+    sheet.getRow(curRow).height = 20;
+    curRow++;
+  });
+
+  // Total Row
+  sheet.mergeCells(curRow, 1, curRow, 2);
+  const totalLabel = sheet.getCell(curRow, 1);
+  totalLabel.value = 'TOTAL';
+  totalLabel.alignment = { horizontal: 'center', vertical: 'middle' };
+  totalLabel.font = { name: 'Arial', size: 10, bold: true };
+  totalLabel.fill = totalFill;
+
+  historicalYears.forEach((y, i) => {
+    const cell = sheet.getCell(curRow, startHistCol + i);
+    const val = totals.historical ? (totals.historical[y] || 0) : 0;
+    cell.value = val;
+    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+    cell.font = { name: 'Arial', size: 10, bold: true };
+    cell.fill = totalFill;
+  });
+
+  const totFocusVals = [
+    totals.totalReceivedAtHq || 0,
+    totals.proposalsSentToCA || 0,
+    totals.proposalsSentBackToDist || 0,
+    totals.obtained || 0,
+    totals.rejected || 0,
+    totals.pendingWithCA || 0
+  ];
+
+  totFocusVals.forEach((val, i) => {
+    const cell = sheet.getCell(curRow, startFocusCol + i);
+    cell.value = val;
+    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+    cell.font = { name: 'Arial', size: 10, bold: true };
+    cell.fill = totalFill;
+  });
+
+  for (let c = 1; c <= totalCols; c++) {
+    sheet.getCell(curRow, c).border = {
+      top: { style: 'thin', color: { argb: 'FF000000' } },
+      left: { style: 'thin', color: { argb: 'FF000000' } },
+      bottom: { style: 'double', color: { argb: 'FF000000' } },
+      right: { style: 'thin', color: { argb: 'FF000000' } }
+    };
+  }
+  sheet.getRow(curRow).height = 22;
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const fileName = `17-A_District_Proposals_Statistics_${focusYear}.xlsx`;
   saveAs(blob, fileName);
 }

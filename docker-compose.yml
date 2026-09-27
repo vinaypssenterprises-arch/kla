@@ -32,6 +32,9 @@ services:
       DATABASE_URL: "postgresql://root:password@postgres:5432/proposals_db?schema=public"
       REDIS_URL: "redis://redis:6379"
       JWT_SECRET: "supersecret17a"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
     depends_on:
       - postgres
       - redis

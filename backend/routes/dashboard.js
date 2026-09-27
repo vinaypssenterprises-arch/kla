@@ -35,21 +35,256 @@ router.get('/stats', async (req, res) => {
   }
 });
 
+// Standard Karnataka Lokayukta SP Police Division Units / Districts in order
+const STANDARD_DISTRICT_ORDER = [
+  'SP-1 BNG CITY', 'SP-2 BNG CITY', 'BANGALORE RURAL', 'BAGALKOT', 'BELGAVI',
+  'BELLARY', 'BIDAR', 'CHAMRAJNAGAR', 'CHIKKABALLAPUR', 'CHIKKAMAGALUR',
+  'CHITRADURGA', 'DAVANGERE', 'DHARWAD', 'GADAG', 'HASSAN', 'HAVERI',
+  'HOSPET', 'KALBURGI', 'KARWAR', 'KODAGU', 'KOLAR', 'KOPPAL', 'MANDYA',
+  'MANGALORE', 'MYSURU', 'RAICHUR', 'RAMANAGARA', 'SHIVAMOGGA', 'TUMAKURU',
+  'UDUPI', 'VIJAYAPURA', 'YADGIR'
+];
+
+function normalizeDistrictName(rawName) {
+  if (!rawName) return 'OTHER';
+  const clean = rawName.trim().toUpperCase();
+  if (clean.includes('SP-1') || clean.includes('SP 1') || clean === 'SP1 BNG CITY') return 'SP-1 BNG CITY';
+  if (clean.includes('SP-2') || clean.includes('SP 2') || clean === 'SP2 BNG CITY') return 'SP-2 BNG CITY';
+  if (clean === 'BENGALURU URBAN' || clean === 'BANGALORE URBAN') return 'SP-1 BNG CITY';
+  if (clean === 'BENGALURU RURAL' || clean === 'BANGALORE RURAL') return 'BANGALORE RURAL';
+  if (clean === 'BAGALKOTE' || clean === 'BAGALKOT') return 'BAGALKOT';
+  if (clean === 'BELAGAVI' || clean === 'BELGAVI') return 'BELGAVI';
+  if (clean === 'BALLARI' || clean === 'BELLARY') return 'BELLARY';
+  if (clean === 'BIDAR') return 'BIDAR';
+  if (clean === 'CHAMARAJANAGAR' || clean === 'CHAMRAJNAGAR') return 'CHAMRAJNAGAR';
+  if (clean === 'CHIKKABALLAPURA' || clean === 'CHIKKABALLAPUR') return 'CHIKKABALLAPUR';
+  if (clean === 'CHIKKAMAGALURU' || clean === 'CHIKKAMAGALUR') return 'CHIKKAMAGALUR';
+  if (clean === 'CHITRADURGA') return 'CHITRADURGA';
+  if (clean === 'DAVANAGERE' || clean === 'DAVANGERE') return 'DAVANGERE';
+  if (clean === 'DHARWAD') return 'DHARWAD';
+  if (clean === 'GADAG') return 'GADAG';
+  if (clean === 'HASSAN') return 'HASSAN';
+  if (clean === 'HAVERI') return 'HAVERI';
+  if (clean === 'HOSPET' || clean === 'VIJAYANAGARA') return 'HOSPET';
+  if (clean === 'KALABURAGI' || clean === 'KALBURGI') return 'KALBURGI';
+  if (clean === 'KARWAR' || clean === 'UTTARA KANNADA') return 'KARWAR';
+  if (clean === 'KODAGU') return 'KODAGU';
+  if (clean === 'KOLAR') return 'KOLAR';
+  if (clean === 'KOPPAL') return 'KOPPAL';
+  if (clean === 'MANDYA') return 'MANDYA';
+  if (clean === 'MANGALORE' || clean === 'DAKSHINA KANNADA') return 'MANGALORE';
+  if (clean === 'MYSURU' || clean === 'MYSORE') return 'MYSURU';
+  if (clean === 'RAICHUR') return 'RAICHUR';
+  if (clean === 'RAMANAGARA') return 'RAMANAGARA';
+  if (clean === 'SHIVAMOGGA') return 'SHIVAMOGGA';
+  if (clean === 'TUMAKURU' || clean === 'TUMKUR') return 'TUMAKURU';
+  if (clean === 'UDUPI') return 'UDUPI';
+  if (clean === 'VIJAYAPURA' || clean === 'BIJAPUR') return 'VIJAYAPURA';
+  if (clean === 'YADGIR') return 'YADGIR';
+  if (clean === 'HEAD OFFICE') return 'HEAD OFFICE';
+  return clean;
+}
+
+function getPetitionYear(p) {
+  if (p.petitionNo && typeof p.petitionNo === 'string') {
+    const m = p.petitionNo.match(/\/(\d{4})$/);
+    if (m) {
+      const y = parseInt(m[1], 10);
+      if (y >= 2000 && y <= 2099) return y;
+    }
+  }
+  if (p.proposalSentDate) {
+    const d = new Date(p.proposalSentDate);
+    if (!isNaN(d.getTime())) return d.getFullYear();
+  }
+  if (p.createdAt) {
+    const d = new Date(p.createdAt);
+    if (!isNaN(d.getTime())) return d.getFullYear();
+  }
+  return new Date().getFullYear();
+}
+
+function getPetitionDate(p) {
+  if (p.proposalSentDate) {
+    const d = new Date(p.proposalSentDate);
+    if (!isNaN(d.getTime())) return d;
+  }
+  if (p.createdAt) {
+    const d = new Date(p.createdAt);
+    if (!isNaN(d.getTime())) return d;
+  }
+  return new Date();
+}
+
 // District-wise and PE-status-wise breakdowns for the Reports page
 router.get('/reports', async (req, res) => {
   try {
-    const [petitionsByDistrict, petitionsByPeStatus, officersByDistrict] = await Promise.all([
-      prisma.petition.groupBy({ by: ['district'], _count: { _all: true }, orderBy: { district: 'asc' } }),
+    const fromDateStr = req.query.fromDate ? req.query.fromDate.trim() : null;
+    const toDateStr = req.query.toDate ? req.query.toDate.trim() : null;
+    const filterDistrict = req.query.district ? req.query.district.trim() : null;
+
+    let fromDate = fromDateStr ? new Date(`${fromDateStr}T00:00:00.000Z`) : null;
+    let toDate = toDateStr ? new Date(`${toDateStr}T23:59:59.999Z`) : null;
+    const focusYear = fromDate ? fromDate.getFullYear() : (parseInt(req.query.year) || new Date().getFullYear());
+
+    const startYear = 2017;
+    const historicalYears = [];
+    for (let y = startYear; y < focusYear; y++) {
+      historicalYears.push(y);
+    }
+
+    const [allDbDistricts, petitions, peGroups, officersByDistrict] = await Promise.all([
+      prisma.district.findMany({ where: { isActive: true }, select: { id: true, name: true } }),
+      prisma.petition.findMany({
+        include: { respondents: true }
+      }),
       prisma.petition.groupBy({ by: ['peStatus'], _count: { _all: true } }),
       prisma.officer.groupBy({ by: ['districtId'], where: { isActive: true }, _count: { _all: true } })
     ]);
 
-    const districts = await prisma.district.findMany({ select: { id: true, name: true } });
-    const districtNameById = Object.fromEntries(districts.map(d => [d.id, d.name]));
+    const districtNameById = Object.fromEntries(allDbDistricts.map(d => [d.id, d.name]));
+
+    const orderedDistricts = [...STANDARD_DISTRICT_ORDER];
+    allDbDistricts.forEach(d => {
+      const norm = normalizeDistrictName(d.name);
+      if (!orderedDistricts.includes(norm)) {
+        orderedDistricts.push(norm);
+      }
+    });
+
+    const districtStatsMap = {};
+    orderedDistricts.forEach(dist => {
+      districtStatsMap[dist] = {
+        district: dist,
+        historical: {},
+        totalReceivedAtHq: 0,
+        proposalsSentToCA: 0,
+        proposalsSentBackToDist: 0,
+        obtained: 0,
+        rejected: 0,
+        pendingWithCA: 0
+      };
+      historicalYears.forEach(y => {
+        districtStatsMap[dist].historical[y] = 0;
+      });
+    });
+
+    petitions.forEach(p => {
+      const normDist = normalizeDistrictName(p.district);
+      if (!districtStatsMap[normDist]) {
+        districtStatsMap[normDist] = {
+          district: normDist,
+          historical: {},
+          totalReceivedAtHq: 0,
+          proposalsSentToCA: 0,
+          proposalsSentBackToDist: 0,
+          obtained: 0,
+          rejected: 0,
+          pendingWithCA: 0
+        };
+        historicalYears.forEach(y => {
+          districtStatsMap[normDist].historical[y] = 0;
+        });
+      }
+
+      const pYear = getPetitionYear(p);
+      const pDate = getPetitionDate(p);
+      const row = districtStatsMap[normDist];
+
+      if (pYear < focusYear) {
+        if (row.historical[pYear] !== undefined) {
+          row.historical[pYear]++;
+        }
+      } else if (pYear === focusYear) {
+        if (fromDate && pDate < fromDate) return;
+        if (toDate && pDate > toDate) return;
+
+        row.totalReceivedAtHq++;
+
+        const propStatus = (p.proposalStatus || '').trim().toLowerCase();
+        const pStatus = (p.status || '').trim();
+
+        const isSentToCA = 
+          propStatus === 'accept' ||
+          pStatus === 'CA_SUBMITTED' ||
+          pStatus === '17A_PERMISSION_PENDING' ||
+          pStatus === '17A_PERMISSION_COMPLETED' ||
+          pStatus === 'PRELIMINARY_ENQUIRY_SUBMITTED' ||
+          p.proposalSentDate != null ||
+          (p.respondents && p.respondents.some(r => r.permissionSentDate || r.caDesignation));
+
+        const isSentBackToDist = 
+          propStatus.includes('returned') ||
+          pStatus === '17A_RETURNED';
+
+        const isObtained = p.respondents && p.respondents.some(r => 
+          (r.permissionStatus || '').trim().toLowerCase() === 'obtain'
+        );
+
+        const isRejected = p.respondents && p.respondents.some(r => 
+          (r.permissionStatus || '').trim().toLowerCase() === 'reject'
+        );
+
+        const isPendingWithCA = isSentToCA && !isObtained && !isRejected;
+
+        if (isSentToCA) row.proposalsSentToCA++;
+        if (isSentBackToDist) row.proposalsSentBackToDist++;
+        if (isObtained) row.obtained++;
+        if (isRejected) row.rejected++;
+        if (isPendingWithCA) row.pendingWithCA++;
+      }
+    });
+
+    let districtStats = orderedDistricts.map((dist, idx) => ({
+      slNo: idx + 1,
+      ...districtStatsMap[dist]
+    }));
+
+    if (filterDistrict && filterDistrict !== 'ALL') {
+      const normFilter = normalizeDistrictName(filterDistrict);
+      districtStats = districtStats.filter(d => d.district === normFilter);
+    }
+
+    const totals = {
+      historical: {},
+      totalReceivedAtHq: 0,
+      proposalsSentToCA: 0,
+      proposalsSentBackToDist: 0,
+      obtained: 0,
+      rejected: 0,
+      pendingWithCA: 0
+    };
+    historicalYears.forEach(y => {
+      totals.historical[y] = 0;
+    });
+
+    districtStats.forEach(row => {
+      historicalYears.forEach(y => {
+        totals.historical[y] += (row.historical[y] || 0);
+      });
+      totals.totalReceivedAtHq += row.totalReceivedAtHq;
+      totals.proposalsSentToCA += row.proposalsSentToCA;
+      totals.proposalsSentBackToDist += row.proposalsSentBackToDist;
+      totals.obtained += row.obtained;
+      totals.rejected += row.rejected;
+      totals.pendingWithCA += row.pendingWithCA;
+    });
+
+    const petitionsByDistrict = districtStats.map(d => ({
+      district: d.district,
+      count: d.totalReceivedAtHq + Object.values(d.historical).reduce((a, b) => a + b, 0)
+    }));
 
     res.json({
-      petitionsByDistrict: petitionsByDistrict.map(r => ({ district: r.district, count: r._count._all })),
-      petitionsByPeStatus: petitionsByPeStatus.map(r => ({ status: r.peStatus || 'Not Set', count: r._count._all })),
+      focusYear,
+      fromDate: fromDateStr,
+      toDate: toDateStr,
+      selectedDistrict: filterDistrict || 'ALL',
+      historicalYears,
+      districtStats,
+      totals,
+      petitionsByDistrict,
+      petitionsByPeStatus: peGroups.map(r => ({ status: r.peStatus || 'Not Set', count: r._count._all })),
       officersByDistrict: officersByDistrict.map(r => ({ district: districtNameById[r.districtId] || 'Unknown', count: r._count._all }))
     });
   } catch (error) {

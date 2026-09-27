@@ -87,6 +87,7 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments 
     defaultValues: isEdit ? {
       district: initialData.district || '',
       petitionNo: initialData.petitionNo || '',
+      type: initialData.type || '',
       petitionerName: initialData.petitionerName || '',
       petitionerAddress: initialData.petitionerAddress || '',
       sirOfficerName: initialData.sirOfficerName || '',
@@ -107,7 +108,7 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments 
       sirEo: initialData.sirEo || '',
     } : {
       district: isAdminNewPetition ? '' : (localStorage.getItem('isHeadOffice') !== '1' ? (localStorage.getItem('districtName') || '') : ''), 
-      petitionNo: '', petitionerName: '', petitionerAddress: '', sirOfficerName: '', officerRank: '', status: 'DRAFT', respondents: [], sirEo: '',
+      petitionNo: '', type: '', petitionerName: '', petitionerAddress: '', sirOfficerName: '', officerRank: '', status: 'DRAFT', respondents: [], sirEo: '',
       proposalStatus: '', proposalSentDate: '',
       peNo: '', peRegDate: '', peReportSentDate: '', peStatus: '',
     }
@@ -162,6 +163,15 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments 
       }
     }
 
+    const parseError = async (res, defaultMsg) => {
+      try {
+        const e = await res.json();
+        return e.error || defaultMsg;
+      } catch (_) {
+        return `${defaultMsg} (HTTP ${res.status})`;
+      }
+    };
+
     try {
       if (actionType === 'ADMIN_UPDATE') {
         const res = await apiFetch(`/petitions/${initialData.id}`, {
@@ -172,8 +182,8 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments 
           showSuccess('Petition updated successfully.');
           navigate('/register');
         } else {
-          const e = await res.json();
-          setErrorMsg(e.error || 'Failed to update petition');
+          const err = await parseError(res, 'Failed to update petition');
+          setErrorMsg(err);
         }
       } else if (actionType === 'ADMIN_CREATE_FULL') {
         const res = await apiFetch(`/petitions`, {
@@ -183,7 +193,10 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments 
         if (res.ok) {
           showSuccess('Petition created successfully.');
           navigate('/register');
-        } else { const e = await res.json(); setErrorMsg(e.error || 'Failed to create'); }
+        } else {
+          const err = await parseError(res, 'Failed to create');
+          setErrorMsg(err);
+        }
       } else if (actionType === 'CREATE_SUBMIT') {
         const res = await apiFetch(`/petitions`, {
           method: 'POST',
@@ -196,7 +209,10 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments 
         if (res.ok) {
           showSuccess('Petition submitted successfully.');
           navigate('/register');
-        } else { const e = await res.json(); setErrorMsg(e.error || 'Failed to create'); }
+        } else {
+          const err = await parseError(res, 'Failed to create');
+          setErrorMsg(err);
+        }
       } else {
         const res = await apiFetch(`/petitions/${initialData.id}/action`, {
           method: 'POST',
@@ -206,12 +222,13 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments 
           showSuccess('Action applied successfully.');
           window.location.reload();
         } else {
-          const e = await res.json(); setErrorMsg(e.error || 'Failed to process action');
+          const err = await parseError(res, 'Failed to process action');
+          setErrorMsg(err);
         }
       }
     } catch (err) {
       console.error(err);
-      setErrorMsg('Network error occurred.');
+      setErrorMsg(err.message || 'Network error occurred.');
     }
   };
 
@@ -292,7 +309,15 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments 
               <label className="text-[12.5px] font-semibold text-ink-text-soft">Petition No.</label>
               <input type="text" className="app-input" {...register('petitionNo')} disabled={!canEditIandII} />
             </div>
-            <div className="flex flex-col gap-1.5 sm:col-span-2">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[12.5px] font-semibold text-ink-text-soft">Type</label>
+              <select className="app-input" {...register('type')} disabled={!canEditIandII}>
+                <option value="">Select Type</option>
+                <option value="Complaint">Complaint</option>
+                <option value="Suo-motu">Suo-motu (Suo-motto)</option>
+              </select>
+            </div>
+            <div className="flex flex-col gap-1.5">
               <label className="text-[12.5px] font-semibold text-ink-text-soft">Name of the Petitioner</label>
               <input type="text" className="app-input" {...register('petitionerName')} disabled={!canEditIandII} />
             </div>
@@ -308,21 +333,6 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments 
               <label className="text-[12.5px] font-semibold text-ink-text-soft">Officer Rank</label>
               <input type="text" className="app-input" placeholder="e.g. SP, DySP, Inspector" {...register('officerRank')} disabled={!canEditIandII} />
             </div>
-            {isAdmin && (
-              <div className="flex flex-col gap-1.5 sm:col-span-2">
-                <label className="text-[12.5px] font-semibold text-ink-text-soft">Workflow Status</label>
-                <select className="app-input font-medium" {...register('status')}>
-                  <option value="DRAFT">DRAFT</option>
-                  <option value="SUBMITTED_TO_SUPERVISOR">SUBMITTED TO SUPERVISOR</option>
-                  <option value="17A_RETURNED">17A RETURNED</option>
-                  <option value="17A_ACCEPTED">17A ACCEPTED</option>
-                  <option value="CA_SUBMITTED">CA SUBMITTED</option>
-                  <option value="17A_PERMISSION_PENDING">17A PERMISSION PENDING</option>
-                  <option value="17A_PERMISSION_COMPLETED">17A PERMISSION COMPLETED</option>
-                  <option value="PRELIMINARY_ENQUIRY_SUBMITTED">PRELIMINARY ENQUIRY SUBMITTED</option>
-                </select>
-              </div>
-            )}
           </div>
         </div>
 

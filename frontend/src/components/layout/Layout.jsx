@@ -29,7 +29,7 @@ export default function Layout({ onLogout }) {
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-40 bg-[#000E89] border-r border-[#1B2B99] shadow-[4px_0_24px_rgba(0,14,137,0.35)] flex flex-col transition-all duration-300 ease-in-out w-[250px]
+        className={`fixed inset-y-0 left-0 z-50 bg-[#000E89] border-r border-[#1B2B99] shadow-[4px_0_24px_rgba(0,14,137,0.35)] flex flex-col transition-all duration-300 ease-in-out w-[250px]
           ${collapsed ? 'lg:w-[76px]' : 'lg:w-[250px]'}
           ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
       >

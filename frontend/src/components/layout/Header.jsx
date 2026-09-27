@@ -16,7 +16,7 @@ export default function Header({ onToggleMobile }) {
   const dateStr = time.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 
   return (
-    <header className="sticky top-0 z-20 flex items-center justify-between py-3 px-5 lg:px-7 bg-[#000E89] border-b-[2px] border-yellow-400 gap-3 shadow-[0_4px_16px_rgba(0,14,137,0.35)]">
+    <header className="sticky top-0 z-40 flex items-center justify-between py-3 px-5 lg:px-7 bg-[#000E89] border-b-[2px] border-yellow-400 gap-3 shadow-[0_4px_16px_rgba(0,14,137,0.35)]">
       <div className="flex items-center gap-3 min-w-0">
         <button type="button" className="icon-btn-dark lg:hidden flex-shrink-0 text-white" onClick={onToggleMobile} title="Menu">
           <Menu className="w-5 h-5" />

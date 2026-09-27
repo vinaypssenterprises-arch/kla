@@ -43,6 +43,7 @@ router.get('/', async (req, res) => {
       ...(search ? {
         OR: [
           { petitionNo: { contains: search, mode: 'insensitive' } },
+          { peNo: { contains: search, mode: 'insensitive' } },
           { petitionerName: { contains: search, mode: 'insensitive' } },
           { district: { contains: search, mode: 'insensitive' } },
           { sirOfficerName: { contains: search, mode: 'insensitive' } },
@@ -124,6 +125,7 @@ router.post('/', async (req, res) => {
         petitionNo: data.petitionNo,
         petitionerName: data.petitionerName,
         petitionerAddress: data.petitionerAddress || null,
+        type: data.type || 'Complaint',
         sirOfficerName: data.sirOfficerName || null,
         officerRank: data.officerRank || null,
         status,
@@ -490,6 +492,7 @@ router.put('/:id', async (req, res) => {
           petitionNo: data.petitionNo,
           petitionerName: data.petitionerName,
           petitionerAddress: data.petitionerAddress || null,
+          type: data.type !== undefined ? data.type : undefined,
           sirOfficerName: data.sirOfficerName || null,
           officerRank: data.officerRank || null,
           proposalStatus: data.proposalStatus || null,

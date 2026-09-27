@@ -19,12 +19,9 @@ export default function PipelineFunnel({ pipeline = [] }) {
           <div className="flex items-center gap-2">
             <span className="inline-block w-2.5 h-2.5 rounded-full bg-brass animate-pulse" />
             <h3 className="text-base font-serif font-bold text-ink-text">
-              Section 17-A Case Progression & Legal Lifecycle Funnel
+              Section 17-A Case Progression
             </h3>
           </div>
-          <p className="text-[12.5px] text-ink-text-soft mt-0.5">
-            Stage-by-stage throughput from petition receipt to statutory sanction and FIR registration.
-          </p>
         </div>
         <div className="flex items-center gap-2 self-start sm:self-auto text-[11px] font-mono font-medium text-ink-text-soft bg-parchment-2/60 px-3 py-1 rounded-md border border-rule/40">
           <span>Total Pipeline Volume:</span>

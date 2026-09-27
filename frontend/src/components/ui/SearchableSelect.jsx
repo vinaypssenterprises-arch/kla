@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useMemo } from 'react';
+import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { 
   ChevronDown, 
   Search, 
@@ -85,11 +85,17 @@ export default function SearchableSelect({
     setOpen(true);
   };
 
-  const closePicker = () => setOpen(false);
+  const closePicker = useCallback(() => {
+    setOpen(false);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
-    const t = setTimeout(() => searchRef.current?.focus(), 40);
+    // Set immediate and delayed focus so search input is ready instantly
+    searchRef.current?.focus();
+    const t = setTimeout(() => {
+      searchRef.current?.focus();
+    }, 50);
     return () => clearTimeout(t);
   }, [open]);
 
@@ -101,19 +107,19 @@ export default function SearchableSelect({
     if (!open) return;
     const itemEl = listRef.current?.querySelector(`[data-idx="${highlighted}"]`);
     if (itemEl) {
-      itemEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      itemEl.scrollIntoView({ block: 'nearest' });
     }
   }, [highlighted, open]);
 
-  const commit = (opt) => {
+  const commit = useCallback((opt) => {
     onChange(opt.value);
     closePicker();
-  };
+  }, [onChange, closePicker]);
 
   const handleSearchKeyDown = (e) => {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      setHighlighted(h => Math.min(h + 1, filtered.length - 1));
+      setHighlighted(h => Math.min(h + 1, Math.max(0, filtered.length - 1)));
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       setHighlighted(h => Math.max(h - 1, 0));
@@ -187,6 +193,7 @@ export default function SearchableSelect({
               </kbd>
               <button 
                 type="button" 
+                tabIndex={-1}
                 onClick={closePicker} 
                 title="Close picker"
                 className="w-8 h-8 rounded-lg flex items-center justify-center text-[#8590A8] hover:text-white hover:bg-white/10 transition-colors"
@@ -206,6 +213,7 @@ export default function SearchableSelect({
               <input
                 ref={searchRef}
                 type="text"
+                autoFocus
                 value={query}
                 onChange={e => setQuery(e.target.value)}
                 onKeyDown={handleSearchKeyDown}
@@ -216,6 +224,7 @@ export default function SearchableSelect({
               {query && (
                 <button
                   type="button"
+                  tabIndex={-1}
                   onClick={() => {
                     setQuery('');
                     searchRef.current?.focus();
@@ -258,6 +267,7 @@ export default function SearchableSelect({
                 </p>
                 <button
                   type="button"
+                  tabIndex={-1}
                   onClick={() => {
                     setQuery('');
                     searchRef.current?.focus();
@@ -284,11 +294,12 @@ export default function SearchableSelect({
                       type="button"
                       key={opt.value}
                       data-idx={idx}
+                      tabIndex={-1}
                       role="option"
                       aria-selected={isSelected}
                       onMouseEnter={() => setHighlighted(idx)}
                       onClick={() => commit(opt)}
-                      className={`w-full flex items-center justify-between gap-3 text-left p-2.5 rounded-xl text-[13.5px] transition-all duration-150 border group ${
+                      className={`w-full flex items-center justify-between gap-3 text-left p-2.5 rounded-xl text-[13.5px] transition-all duration-150 border group cursor-pointer ${
                         isSelected
                           ? 'bg-amber-500/10 border-[#C9A15E] shadow-xs'
                           : isHighlighted

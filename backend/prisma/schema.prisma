@@ -119,6 +119,7 @@ model Petition {
   petitionNo       String       @unique
   petitionerName   String
   petitionerAddress String?
+  type             String?      @default("Complaint")
   sirOfficerName   String?
   officerRank      String?
   proposalStatus   String?

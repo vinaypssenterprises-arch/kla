@@ -4,10 +4,12 @@ import { useNavigate } from 'react-router-dom';
 import {
   Search, Plus, ArchiveX, Eye, Pencil, Trash2, X, Download,
   FileText, Calendar, Users, MessageSquare, MapPin, CheckCircle2,
-  ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
-  AlertCircle, Clock, Gavel, Shield
+  ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronDown,
+  AlertCircle, Clock, Gavel, Shield, Building2, SlidersHorizontal, FileDown,
+  Settings2
 } from 'lucide-react';
 import { exportPetitionsToExcel } from '../lib/exportExcel';
+import { exportPetitionToPdf } from '../lib/exportPdf';
 import Modal from '../components/ui/Modal';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import SearchableSelect from '../components/ui/SearchableSelect';
@@ -22,8 +24,10 @@ export default function RegisterList() {
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [viewingEntry, setViewingEntry] = useState(null);
+  const [modalTab, setModalTab] = useState('all');
   const [deletingId, setDeletingId] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [actionMenu, setActionMenu] = useState(null);
   const { showError, showSuccess } = useToast();
 
   // Pagination & filters
@@ -97,6 +101,49 @@ export default function RegisterList() {
     ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
     : '—';
 
+  const handleOpenView = (entry) => {
+    setViewingEntry(entry);
+    setModalTab('all');
+  };
+
+  // Close action menu on click outside, scroll, resize, or Escape
+  useEffect(() => {
+    if (!actionMenu) return;
+    const close = () => setActionMenu(null);
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') setActionMenu(null);
+    };
+    window.addEventListener('click', close);
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('resize', close);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('click', close);
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('resize', close);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [actionMenu]);
+
+  const handleToggleActionMenu = (e, entry) => {
+    e.stopPropagation();
+    if (actionMenu?.id === entry.id) {
+      setActionMenu(null);
+      return;
+    }
+    const rect = e.currentTarget.getBoundingClientRect();
+    const right = Math.max(12, window.innerWidth - rect.right);
+    const top = rect.bottom + 6;
+    const openUpwards = top + 160 > window.innerHeight;
+    setActionMenu({
+      id: entry.id,
+      entry,
+      top: openUpwards ? undefined : top,
+      bottom: openUpwards ? window.innerHeight - rect.top + 6 : undefined,
+      right,
+    });
+  };
+
   const handleExportExcel = async () => {
     try {
       await exportPetitionsToExcel({
@@ -132,12 +179,44 @@ export default function RegisterList() {
   };
 
   const renderPermissionBadge = (status) => {
-    switch (status) {
-      case 'Obtain': return <span className="stamp stamp-success ml-1">Obtained</span>;
-      case 'Reject': return <span className="stamp stamp-danger ml-1">Rejected</span>;
-      case 'Pending': return <span className="stamp stamp-pending ml-1">Pending</span>;
-      default: return null;
+    const s = (status || '').toLowerCase().trim();
+    if (s === 'obtain' || s === 'obtained') {
+      return <span className="stamp stamp-success">OBTAINED</span>;
     }
+    if (s === 'reject' || s === 'rejected') {
+      return <span className="stamp stamp-danger">REJECTED</span>;
+    }
+    if (s === 'pending') {
+      return <span className="stamp stamp-pending">PENDING</span>;
+    }
+    return <span className="text-[11px] text-ink-text-faint/60 italic font-mono px-2">—</span>;
+  };
+
+  const renderProposalBadge = (status) => {
+    if (!status) return <span className="text-[12px] text-ink-text-faint/60 italic font-mono">—</span>;
+    const s = status.toLowerCase().trim();
+    if (s === 'accept') {
+      return <span className="stamp stamp-success">ACCEPT</span>;
+    }
+    if (s === 'reject') {
+      return <span className="stamp stamp-danger">REJECT</span>;
+    }
+    return <span className="stamp stamp-warning">{status.toUpperCase()}</span>;
+  };
+
+  const renderPeStatusBadge = (status) => {
+    if (!status) return <span className="text-[12px] text-ink-text-faint/60 italic font-mono">—</span>;
+    const s = status.toLowerCase().trim();
+    if (s.includes('fir')) {
+      return <span className="stamp stamp-danger">REGISTER FIR</span>;
+    }
+    if (s === 'close') {
+      return <span className="stamp stamp-neutral">CLOSE</span>;
+    }
+    if (s.includes('de')) {
+      return <span className="stamp stamp-info">RECOMMENDED TO DE</span>;
+    }
+    return <span className="stamp stamp-info">{status.toUpperCase()}</span>;
   };
 
   const activeDistricts = allDistricts.map(d => d.name).sort();
@@ -147,9 +226,9 @@ export default function RegisterList() {
     <>
       {Array.from({ length: pageSize > 10 ? 8 : pageSize }).map((_, i) => (
         <tr key={i} className="pointer-events-none">
-          {[40, 80, 70, 120, 130, 70, 70, 70, 50].map((w, j) => (
-            <td key={j} className="py-[14px] px-5">
-              <div className={`h-4 skeleton-line rounded`} style={{ width: w }} />
+          {[40, 90, 140, 130, 170, 80, 80, 100, 80, 48].map((w, j) => (
+            <td key={j} className="py-3.5 px-3">
+              <div className={`h-4 skeleton-line rounded mx-auto`} style={{ width: w }} />
             </td>
           ))}
         </tr>
@@ -167,13 +246,17 @@ export default function RegisterList() {
       {/* Page Header */}
       <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
         <div>
-          <h2 className="text-[21px] font-serif font-semibold text-ink-text">Register — All Petitions</h2>
-          <p className="text-[13.5px] text-ink-text-soft mt-1">
-            17-A proposals and preliminary enquiry status.
-            {total > 0 && <span className="ml-2 font-semibold text-ink-text">{total.toLocaleString()} total records</span>}
+          <h2 className="text-[22px] font-serif font-bold text-ink-text tracking-tight">17-A Proposals & Status Register</h2>
+          <p className="text-[13.5px] text-ink-text-soft mt-0.5">
+            Petitions, sanction proposals under Sec. 17-A, and Preliminary Enquiry tracker
+            {total > 0 && (
+              <span className="ml-2.5 px-2 py-0.5 rounded-full text-[11.5px] font-bold bg-[#EAE4D2] text-[#4A3E25]">
+                {total.toLocaleString()} total records
+              </span>
+            )}
           </p>
         </div>
-        <button type="button" className="btn btn-excel no-print" title="Export to Excel" onClick={handleExportExcel}>
+        <button type="button" className="btn btn-excel no-print shadow-sm" title="Export to Excel" onClick={handleExportExcel}>
           <Download className="w-[15px] h-[15px]" />
           Export Excel
         </button>
@@ -219,6 +302,17 @@ export default function RegisterList() {
           <option value="Recommended to DE">Recommended to DE</option>
           <option value="Close">Close</option>
         </select>
+        {(searchQuery || districtFilter || statusFilter) && (
+          <button
+            type="button"
+            className="btn btn-secondary py-2 px-3 text-[12.5px]"
+            onClick={() => { setSearchQuery(''); setDebouncedSearch(''); setDistrictFilter(''); setStatusFilter(''); }}
+            title="Reset all filters"
+          >
+            <X className="w-3.5 h-3.5" />
+            Clear Filters
+          </button>
+        )}
         <button type="button" className="btn btn-primary md:ml-auto" onClick={() => navigate('/register/new')}>
           <Plus className="w-[18px] h-[18px]" strokeWidth={2.3} />
           Add Petition
@@ -227,9 +321,9 @@ export default function RegisterList() {
 
       {/* Table */}
       {!loading && entries.length === 0 ? (
-        <div className="flex flex-col items-center text-center py-20 px-5 bg-[#FFFDF7] rounded-xl border border-rule shadow-soft">
+        <div className="flex flex-col items-center text-center py-20 px-5 bg-white rounded-xl border border-[#D5CCA8] shadow-sm">
           <ArchiveX className="w-[52px] h-[52px] text-ink-text-faint mb-[18px]" strokeWidth={1.5} />
-          <h3 className="text-[19px] text-ink-text mb-2 font-serif">
+          <h3 className="text-[19px] text-ink-text mb-2 font-serif font-semibold">
             {debouncedSearch || districtFilter || statusFilter ? 'No results match your filters' : 'No petitions on file yet'}
           </h3>
           <p className="text-[13.5px] text-ink-text-soft mb-6 max-w-[340px]">
@@ -245,20 +339,21 @@ export default function RegisterList() {
           )}
         </div>
       ) : (
-        <section className="bg-[#FFFDF7] border border-rule rounded-m overflow-hidden shadow-soft">
+        <section className="bg-white border border-[#D5CCA8] rounded-xl overflow-hidden shadow-[0_4px_20px_rgba(0,14,137,0.05)]">
           <div className="overflow-x-auto">
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>Sl.No</th>
-                  <th>District</th>
-                  <th>Petition No.</th>
-                  <th>Petitioner</th>
-                  <th>Respondents</th>
-                  <th>Proposal</th>
-                  <th>Permission</th>
-                  <th>PE Status</th>
-                  <th></th>
+                  <th className="w-[52px] text-center">#</th>
+                  <th className="min-w-[130px]">District</th>
+                  <th className="min-w-[170px]">Petition No.</th>
+                  <th className="min-w-[170px]">Petitioner</th>
+                  <th className="min-w-[220px]">Respondents</th>
+                  <th className="min-w-[110px]">Proposal</th>
+                  <th className="min-w-[120px]">Permission</th>
+                  <th className="min-w-[140px]">PE No. & Date</th>
+                  <th className="min-w-[130px]">PE Status</th>
+                  <th className="w-20 text-center">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -266,61 +361,193 @@ export default function RegisterList() {
                   <SkeletonRows />
                 ) : (
                   entries.map((entry, idx) => (
-                    <tr key={entry.id} onClick={() => setViewingEntry(entry)}>
-                      <td className="font-mono">{(page - 1) * pageSize + idx + 1}</td>
-                      <td className="font-semibold text-ink-text">{entry.district}</td>
-                      <td className="font-mono">{entry.petitionNo}</td>
-                      <td>{entry.petitionerName}</td>
-                      <td>
-                        <div className="flex flex-col gap-1 max-w-[200px]">
-                          {entry.respondents.map((r) => (
-                            <div key={r.id} className="text-[12px] truncate" title={r.name}>
-                              &bull; {r.name}
-                            </div>
-                          ))}
+                    <tr
+                      key={entry.id}
+                      onClick={() => handleOpenView(entry)}
+                      className="group"
+                    >
+                      {/* Sl.No */}
+                      <td className="text-center font-mono text-[12px] font-semibold text-ink-text-soft/80">
+                        {(page - 1) * pageSize + idx + 1}
+                      </td>
+
+                      {/* District */}
+                      <td className="whitespace-nowrap">
+                        <div className="flex items-center gap-1.5 font-semibold text-ink-text text-[13px]">
+                          <MapPin className="w-3.5 h-3.5 text-brass flex-shrink-0" />
+                          <span>{entry.district || '—'}</span>
                         </div>
                       </td>
+
+                      {/* Petition No. */}
                       <td>
-                        {entry.proposalStatus && (
-                          <span className={`stamp ${entry.proposalStatus === 'Accept' ? 'stamp-success' : 'stamp-warning'}`}>
-                            {entry.proposalStatus}
+                        <div className="flex flex-col items-start gap-1">
+                          <span
+                            className="inline-flex items-center gap-1.5 font-mono text-[12px] font-bold text-[#000E89] bg-[#E8EEF9] border border-[#CBD8EF] px-2.5 py-1 rounded-md shadow-xs whitespace-nowrap"
+                            title={entry.petitionNo}
+                          >
+                            <FileText className="w-3.5 h-3.5 text-[#000E89]/70 flex-shrink-0" />
+                            {entry.petitionNo}
                           </span>
-                        )}
-                      </td>
-                      <td>
-                        <div className="flex flex-wrap gap-1 max-w-[150px]">
-                          {entry.respondents.map((r) => r.permissionStatus ? renderPermissionBadge(r.permissionStatus) : null)}
-                        </div>
-                      </td>
-                      <td>
-                        {entry.peStatus && (
-                          <span className={`stamp ${entry.peStatus === 'Register FIR' ? 'stamp-danger' : entry.peStatus === 'Close' ? 'stamp-neutral' : 'stamp-info'}`}>
-                            {entry.peStatus}
-                          </span>
-                        )}
-                      </td>
-                      <td onClick={e => e.stopPropagation()}>
-                        <div className="flex gap-1">
-                          <button type="button" className="icon-btn" title="View" onClick={() => setViewingEntry(entry)}>
-                            <Eye className="w-4 h-4" />
-                          </button>
-                          {(role === 'admin' || entry.createdById === currentUserId || entry.createdBy?.supervisorUserId === currentUserId) && (
-                            <>
-                              <button type="button" className="icon-btn" title="Edit" onClick={() => navigate(`/register/${entry.id}/edit`)}>
-                                <Pencil className="w-4 h-4" />
-                              </button>
-                              <button
-                                type="button"
-                                className="icon-btn hover:!bg-brick-bg hover:!text-brick disabled:opacity-40 disabled:cursor-not-allowed"
-                                title="Delete"
-                                disabled={deletingId === entry.id}
-                                onClick={(e) => { e.stopPropagation(); setDeleteTarget(entry); }}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </>
+                          {entry.type && (
+                            <span className={`inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded border ${
+                              (entry.type || '').toLowerCase().includes('suo')
+                                ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                : 'bg-slate-50 text-slate-600 border-slate-200'
+                            }`}>
+                              {entry.type}
+                            </span>
                           )}
                         </div>
+                      </td>
+
+                      {/* Petitioner */}
+                      <td className="max-w-[200px]">
+                        <div className="font-semibold text-ink-text text-[13px] leading-snug line-clamp-2" title={entry.petitionerName}>
+                          {entry.petitionerName}
+                        </div>
+                        {entry.petitionerAddress && (
+                          <div className="text-[11px] text-ink-text-faint truncate mt-0.5" title={entry.petitionerAddress}>
+                            {entry.petitionerAddress}
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Respondents (clean professional sub-rows with dividing lines) */}
+                      <td className="p-0 align-top">
+                        <div className="divide-y divide-[#E2D9C2]">
+                          {entry.respondents?.length > 0 ? (
+                            entry.respondents.map((r, i) => (
+                              <div
+                                key={r.id || i}
+                                className="min-h-[46px] px-4 py-2 flex items-center gap-2 text-[12.5px] leading-tight"
+                                title={`${r.name}${r.designation ? ` (${r.designation})` : ''}${r.department ? ` · ${r.department}` : ''}`}
+                              >
+                                <span className="w-5 h-5 rounded-full bg-[#EAE4D2] text-[#4A3E25] text-[10px] font-bold flex items-center justify-center flex-shrink-0 shadow-2xs border border-[#DDD5BE]">
+                                  {i + 1}
+                                </span>
+                                <span className="font-semibold text-ink-text truncate">{r.name}</span>
+                                {r.designation && (
+                                  <span className="text-[11.5px] text-ink-text-soft truncate font-normal">
+                                    · {r.designation}
+                                  </span>
+                                )}
+                              </div>
+                            ))
+                          ) : (
+                            <div className="min-h-[46px] px-4 py-2 flex items-center text-[12px] text-ink-text-faint italic font-mono">
+                              —
+                            </div>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Proposal (aligned per respondent with divider lines) */}
+                      <td className="p-0 align-top">
+                        <div className="divide-y divide-[#E2D9C2]">
+                          {entry.respondents?.length > 0 ? (
+                            entry.respondents.map((r, i) => (
+                              <div key={r.id || i} className="min-h-[46px] px-4 py-2 flex items-center">
+                                {renderProposalBadge(entry.proposalStatus)}
+                              </div>
+                            ))
+                          ) : (
+                            <div className="min-h-[46px] px-4 py-2 flex items-center">
+                              {renderProposalBadge(entry.proposalStatus)}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Permission (aligned per respondent with divider lines) */}
+                      <td className="p-0 align-top">
+                        <div className="divide-y divide-[#E2D9C2]">
+                          {entry.respondents?.length > 0 ? (
+                            entry.respondents.map((r, i) => (
+                              <div key={r.id || i} className="min-h-[46px] px-4 py-2 flex items-center">
+                                {renderPermissionBadge(r.permissionStatus)}
+                              </div>
+                            ))
+                          ) : (
+                            <div className="min-h-[46px] px-4 py-2 flex items-center text-[12px] text-ink-text-faint italic font-mono">
+                              —
+                            </div>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* PE No. & Date */}
+                      <td className="p-0 align-top">
+                        <div className="divide-y divide-[#E2D9C2]">
+                          {entry.respondents?.length > 0 ? (
+                            entry.respondents.map((r, i) => (
+                              <div key={r.id || i} className="min-h-[46px] px-3.5 py-1.5 flex flex-col justify-center items-start">
+                                {entry.peNo ? (
+                                  <span className="font-mono text-[11px] font-bold text-[#000E89] bg-[#E8EEF9] border border-[#CBD8EF] px-1.5 py-0.5 rounded shadow-2xs">
+                                    PE #{entry.peNo}
+                                  </span>
+                                ) : (
+                                  <span className="text-[11.5px] text-ink-text-faint/60 italic font-mono">—</span>
+                                )}
+                                {entry.peRegDate && (
+                                  <span className="text-[10px] text-ink-text-soft flex items-center gap-1 mt-0.5 font-mono">
+                                    <Calendar className="w-2.5 h-2.5 text-brass flex-shrink-0" />
+                                    {formatDate(entry.peRegDate)}
+                                  </span>
+                                )}
+                              </div>
+                            ))
+                          ) : (
+                            <div className="min-h-[46px] px-3.5 py-1.5 flex flex-col justify-center items-start">
+                              {entry.peNo ? (
+                                <span className="font-mono text-[11px] font-bold text-[#000E89] bg-[#E8EEF9] border border-[#CBD8EF] px-1.5 py-0.5 rounded shadow-2xs">
+                                  PE #{entry.peNo}
+                                </span>
+                              ) : (
+                                <span className="text-[11.5px] text-ink-text-faint/60 italic font-mono">—</span>
+                              )}
+                              {entry.peRegDate && (
+                                <span className="text-[10px] text-ink-text-soft flex items-center gap-1 mt-0.5 font-mono">
+                                  <Calendar className="w-2.5 h-2.5 text-brass flex-shrink-0" />
+                                  {formatDate(entry.peRegDate)}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* PE Status (aligned per respondent with divider lines) */}
+                      <td className="p-0 align-top">
+                        <div className="divide-y divide-[#E2D9C2]">
+                          {entry.respondents?.length > 0 ? (
+                            entry.respondents.map((r, i) => (
+                              <div key={r.id || i} className="min-h-[46px] px-4 py-2 flex items-center">
+                                {renderPeStatusBadge(entry.peStatus)}
+                              </div>
+                            ))
+                          ) : (
+                            <div className="min-h-[46px] px-4 py-2 flex items-center">
+                              {renderPeStatusBadge(entry.peStatus)}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Actions */}
+                      <td onClick={e => e.stopPropagation()} className="text-center px-2">
+                        <button
+                          type="button"
+                          className={`w-7 h-7 rounded-lg inline-flex items-center justify-center transition-all border ${
+                            actionMenu?.id === entry.id
+                              ? 'bg-[#000E89] text-white border-[#000E89] shadow-xs'
+                              : 'bg-[#F4F7FC] hover:bg-[#000E89] text-[#000E89] hover:text-white border-[#CBD8EF]'
+                          }`}
+                          title="Manage Case"
+                          onClick={(e) => handleToggleActionMenu(e, entry)}
+                        >
+                          <Settings2 className="w-4 h-4" />
+                        </button>
                       </td>
                     </tr>
                   ))
@@ -372,190 +599,471 @@ export default function RegisterList() {
         </section>
       )}
 
-      {/* ── Premium View Modal ── */}
-      <Modal open={!!viewingEntry} onClose={() => setViewingEntry(null)} overlayClassName="bg-black/65 backdrop-blur-[8px]">
+      {/* ── Modern Floating Actions Menu ── */}
+      {actionMenu && (
+        <div
+          className="fixed z-50 w-52 bg-white rounded-xl shadow-[0_12px_36px_rgba(0,14,137,0.2)] border border-[#D5CCA8] py-1 text-[13px] animate-in fade-in zoom-in-95 duration-100 divide-y divide-rule/40 font-sans"
+          style={{
+            top: actionMenu.top !== undefined ? `${actionMenu.top}px` : 'auto',
+            bottom: actionMenu.bottom !== undefined ? `${actionMenu.bottom}px` : 'auto',
+            right: `${actionMenu.right}px`,
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="px-3.5 py-2 text-[11px] font-mono font-semibold text-ink-text-soft bg-[#FBF9F4] flex items-center justify-between">
+            <span className="text-[10px] tracking-wide uppercase text-ink-text-faint font-sans font-bold">Action Menu</span>
+            <span className="text-[#000E89] font-bold truncate max-w-[100px]" title={actionMenu.entry.petitionNo}>
+              {actionMenu.entry.petitionNo}
+            </span>
+          </div>
+          <div className="py-1">
+            <button
+              type="button"
+              className="w-full px-3.5 py-2 text-left flex items-center gap-2.5 text-ink-text hover:bg-[#E8EEF9] hover:text-[#000E89] font-medium transition-colors"
+              onClick={() => {
+                const entry = actionMenu.entry;
+                setActionMenu(null);
+                handleOpenView(entry);
+              }}
+            >
+              <Eye className="w-4 h-4 text-[#000E89] flex-shrink-0" />
+              <span>View Dossier (I–VI)</span>
+            </button>
+            <button
+              type="button"
+              className="w-full px-3.5 py-2 text-left flex items-center gap-2.5 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 font-medium transition-colors"
+              onClick={() => {
+                const entry = actionMenu.entry;
+                setActionMenu(null);
+                exportPetitionToPdf(entry);
+                showSuccess(`Downloading PDF for ${entry.petitionNo}…`);
+              }}
+            >
+              <FileDown className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+              <span>Download PDF Dossier</span>
+            </button>
+            {(role === 'admin' || actionMenu.entry.createdById === currentUserId || actionMenu.entry.createdBy?.supervisorUserId === currentUserId) && (
+              <>
+                <button
+                  type="button"
+                  className="w-full px-3.5 py-2 text-left flex items-center gap-2.5 text-ink-text hover:bg-amber-50 hover:text-amber-800 font-medium transition-colors"
+                  onClick={() => {
+                    const id = actionMenu.entry.id;
+                    setActionMenu(null);
+                    navigate(`/register/${id}/edit`);
+                  }}
+                >
+                  <Pencil className="w-4 h-4 text-amber-700 flex-shrink-0" />
+                  <span>Edit Petition</span>
+                </button>
+                <button
+                  type="button"
+                  disabled={deletingId === actionMenu.entry.id}
+                  className="w-full px-3.5 py-2 text-left flex items-center gap-2.5 text-red-600 hover:bg-red-50 hover:text-red-700 font-medium transition-colors disabled:opacity-40"
+                  onClick={() => {
+                    const entry = actionMenu.entry;
+                    setActionMenu(null);
+                    setDeleteTarget(entry);
+                  }}
+                >
+                  <Trash2 className="w-4 h-4 text-red-600 flex-shrink-0" />
+                  <span>Delete Petition</span>
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── New Tech Executive View Modal ── */}
+      <Modal open={!!viewingEntry} onClose={() => setViewingEntry(null)} overlayClassName="bg-black/65 backdrop-blur-[6px]">
         {viewingEntry && (
-          <div className="bg-[#0D1627] rounded-2xl shadow-[0_40px_80px_rgba(0,0,0,0.7)] w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden border border-white/10">
+          <div className="bg-[#FAF8F2] rounded-2xl shadow-[0_25px_70px_rgba(0,14,137,0.35)] w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden border border-[#D5CCA8] animate-in fade-in zoom-in-95 duration-200">
 
-            {/* Modal Header — dark with brass accent */}
-            <div className="relative bg-gradient-to-r from-[#0D1627] to-[#12192B] px-7 py-5 flex items-start justify-between flex-shrink-0 border-b border-white/10">
-              {/* Top brass accent line */}
-              <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#C9A15E] to-transparent" />
+            {/* Header: Lokayukta Deep Navy & Gold */}
+            <div className="relative bg-gradient-to-r from-[#000E89] via-[#081868] to-[#000E89] px-7 pt-6 pb-4 text-white flex-shrink-0">
+              {/* Golden accent bar */}
+              <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-transparent via-[#C9A15E] to-transparent" />
 
-              <div className="flex-1 pr-10">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="w-8 h-8 rounded-lg bg-[#C9A15E]/15 border border-[#C9A15E]/30 flex items-center justify-center">
-                    <FileText className="w-4 h-4 text-[#C9A15E]" />
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-2 flex-wrap">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#C9A15E]/20 text-[#F5DEB3] border border-[#C9A15E]/40 text-[10.5px] font-bold tracking-widest uppercase">
+                      <Shield className="w-3 h-3 text-[#C9A15E]" />
+                      Karnataka Lokayukta · Sec. 17-A Case Docket
+                    </span>
+                    <span className="text-[11px] text-white/60 font-mono">
+                      Filed: {formatDate(viewingEntry.createdAt)}
+                    </span>
                   </div>
-                  <span className="text-[10px] font-semibold text-[#8590A8] tracking-widest uppercase">
-                    Karnataka Lokayukta · Sec. 17-A
-                  </span>
+
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <h3 className="text-[26px] font-serif font-bold text-white tracking-tight leading-none">
+                      {viewingEntry.petitionNo}
+                    </h3>
+                    {viewingEntry.proposalStatus && renderProposalBadge(viewingEntry.proposalStatus)}
+                    {viewingEntry.peStatus && renderPeStatusBadge(viewingEntry.peStatus)}
+                  </div>
+
+                  <div className="flex items-center gap-4 text-[13px] text-white/85 mt-2.5 flex-wrap">
+                    <span className="flex items-center gap-1.5 font-medium">
+                      <MapPin className="w-3.5 h-3.5 text-[#C9A15E]" />
+                      {viewingEntry.district}
+                    </span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-white/30" />
+                    <span className="flex items-center gap-1.5 font-medium truncate">
+                      <Users className="w-3.5 h-3.5 text-[#C9A15E]" />
+                      Petitioner: <span className="text-white font-semibold truncate">{viewingEntry.petitionerName}</span>
+                    </span>
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-3 mb-2 flex-wrap">
-                  <h3 className="text-[28px] font-serif font-bold text-[#F5EFE1] leading-none tracking-tight">
-                    {viewingEntry.petitionNo}
-                  </h3>
-                  {viewingEntry.proposalStatus && (
-                    <span className={`px-2.5 py-1 rounded-lg text-[11px] font-bold tracking-wider uppercase border ${
-                      viewingEntry.proposalStatus.toLowerCase() === 'accept'
-                        ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
-                        : viewingEntry.proposalStatus.toLowerCase() === 'reject'
-                        ? 'bg-rose-500/15 text-rose-300 border-rose-500/30'
-                        : 'bg-amber-500/15 text-amber-300 border-amber-500/30'
-                    }`}>
-                      {viewingEntry.proposalStatus}
-                    </span>
-                  )}
-                  {viewingEntry.peStatus && (
-                    <span className={`px-2.5 py-1 rounded-lg text-[11px] font-bold tracking-wider uppercase border ${
-                      viewingEntry.peStatus.includes('FIR')
-                        ? 'bg-red-500/15 text-red-300 border-red-500/30'
-                        : 'bg-blue-500/15 text-blue-300 border-blue-500/30'
-                    }`}>
-                      {viewingEntry.peStatus}
-                    </span>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-3 text-[13px] text-[#8590A8] flex-wrap">
-                  <span className="flex items-center gap-1.5">
-                    <MapPin className="w-3.5 h-3.5 text-brass opacity-70" />
-                    {viewingEntry.district}
-                  </span>
-                  <span className="w-1 h-1 bg-[#3A4870] rounded-full" />
-                  <span className="flex items-center gap-1.5">
-                    <Users className="w-3.5 h-3.5 opacity-70" />
-                    {viewingEntry.petitionerName}
-                  </span>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#C9A15E] hover:bg-[#b58e4e] text-[#000E89] text-[12px] font-bold shadow-md transition-all active:scale-95 cursor-pointer"
+                    onClick={() => {
+                      exportPetitionToPdf(viewingEntry);
+                      showSuccess(`Downloading PDF for ${viewingEntry.petitionNo}…`);
+                    }}
+                    title="Download Case PDF Dossier"
+                  >
+                    <FileDown className="w-3.5 h-3.5" />
+                    <span>Download PDF</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/10 hover:bg-white/20 text-white/80 hover:text-white transition-colors border border-white/15 flex-shrink-0"
+                    onClick={() => setViewingEntry(null)}
+                    title="Close Modal"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
 
-              <button
-                type="button"
-                className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-lg bg-white/5 hover:bg-white/10 text-white/50 hover:text-white transition-colors border border-white/10"
-                onClick={() => setViewingEntry(null)}
-              >
-                <X className="w-4 h-4" />
-              </button>
+              {/* Navigation Tabs Aligned with Form Flow I-VI */}
+              <div className="flex gap-1.5 mt-5 pt-3 border-t border-white/15 overflow-x-auto no-scrollbar">
+                {[
+                  { id: 'all', label: 'Complete Form Flow (I–VI)' },
+                  { id: 'sec1', label: 'I. Petition' },
+                  { id: 'sec2', label: `II. Respondents (${viewingEntry.respondents?.length || 0})` },
+                  { id: 'sec3', label: 'III. 17-A Proposal' },
+                  { id: 'sec4', label: 'IV. Competent Authority' },
+                  { id: 'sec5', label: 'V. 17-A Permission' },
+                  { id: 'sec6', label: 'VI. Preliminary Enquiry' },
+                  ...(viewingEntry.remarks?.length > 0 ? [{ id: 'remarks', label: `Remarks (${viewingEntry.remarks.length})` }] : [])
+                ].map(tab => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setModalTab(tab.id)}
+                    className={`px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-all whitespace-nowrap ${
+                      modalTab === tab.id
+                        ? 'bg-white text-[#000E89] shadow-md font-bold'
+                        : 'text-white/85 hover:bg-white/10 hover:text-white'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            {/* Scrollable Body */}
-            <div className="flex-1 overflow-y-auto bg-[#0F1B2D]">
+            {/* Scrollable Modal Content: Mirrors FormPage.jsx Sections I through VI */}
+            <div className="flex-1 overflow-y-auto p-7 space-y-6">
 
-              {/* Overview grid */}
-              <div className="px-7 py-5 border-b border-white/8">
-                <div className="flex items-center gap-2 mb-4">
-                  <Shield className="w-4 h-4 text-[#C9A15E]" />
-                  <h4 className="text-[11px] font-bold text-[#8590A8] uppercase tracking-widest">Case Overview</h4>
-                </div>
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
-                  {[
-                    { label: 'Proposal Status', value: viewingEntry.proposalStatus || '—' },
-                    { label: 'Sent to CA', value: formatDate(viewingEntry.proposalSentDate) },
-                    { label: 'PE Number', value: viewingEntry.peNo || '—' },
-                    { label: 'PE Reg. Date', value: formatDate(viewingEntry.peRegDate) },
-                    { label: 'PE Status', value: viewingEntry.peStatus || '—' },
-                    { label: 'PE Report Sent', value: formatDate(viewingEntry.peReportSentDate) },
-                    { label: 'SIR Officer Name', value: viewingEntry.sirOfficerName || '—' },
-                    { label: 'Officer Rank', value: viewingEntry.officerRank || '—' },
-                    { label: 'Petitioner Address', value: viewingEntry.petitionerAddress || '—', span: 2 },
-                  ].map(({ label, value, span }) => (
-                    <div key={label} className={span === 2 ? 'col-span-2' : ''}>
-                      <div className="text-[10.5px] text-[#536089] font-semibold uppercase tracking-wider mb-1">{label}</div>
-                      <div className="text-[13px] font-medium text-[#C5D0E0]">{value}</div>
+              {/* ── Section I: Petition Details ── */}
+              {(modalTab === 'all' || modalTab === 'sec1') && (
+                <div className="bg-white rounded-xl p-5 border border-[#E2D9C2] shadow-sm">
+                  <div className="flex items-center gap-2 mb-4 pb-2.5 border-b border-[#EFE8D8]">
+                    <span className="font-mono text-[12px] font-bold text-white bg-[#000E89] px-2 py-0.5 rounded shadow-2xs">I.</span>
+                    <h4 className="text-[14px] font-serif font-bold text-ink-text uppercase tracking-wide">Petition Details</h4>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-[13px]">
+                    <div>
+                      <span className="text-[11.5px] font-bold text-ink-text-soft block mb-1">District</span>
+                      <div className="font-semibold text-ink-text flex items-center gap-1.5">
+                        <MapPin className="w-3.5 h-3.5 text-brass" />
+                        {viewingEntry.district || '—'}
+                      </div>
                     </div>
-                  ))}
+                    <div>
+                      <span className="text-[11.5px] font-bold text-ink-text-soft block mb-1">Petition No.</span>
+                      <div className="font-mono font-bold text-[#000E89] bg-[#E8EEF9] border border-[#CBD8EF] px-2 py-0.5 rounded inline-block">
+                        {viewingEntry.petitionNo}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-[11.5px] font-bold text-ink-text-soft block mb-1">Type</span>
+                      <span className={`inline-block px-2 py-0.5 rounded font-semibold text-[11px] border ${
+                        (viewingEntry.type || '').toLowerCase().includes('suo')
+                          ? 'bg-purple-50 text-purple-700 border-purple-200'
+                          : 'bg-slate-50 text-slate-700 border-slate-200'
+                      }`}>
+                        {viewingEntry.type || 'Complaint'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[11.5px] font-bold text-ink-text-soft block mb-1">Name of the Petitioner</span>
+                      <div className="font-semibold text-ink-text">{viewingEntry.petitionerName || '—'}</div>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <span className="text-[11.5px] font-bold text-ink-text-soft block mb-1">Address of the Petitioner</span>
+                      <div className="text-ink-text bg-[#FAF8F2] border border-[#EAE3D0] rounded-lg p-2.5 text-[12.5px]">
+                        {viewingEntry.petitionerAddress || 'No address registered on record'}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-[11.5px] font-bold text-ink-text-soft block mb-1">SIR Officer Name</span>
+                      <div className="font-semibold text-ink-text">{viewingEntry.sirOfficerName || '—'}</div>
+                    </div>
+                    <div>
+                      <span className="text-[11.5px] font-bold text-ink-text-soft block mb-1">Officer Rank</span>
+                      <div className="font-semibold text-ink-text">{viewingEntry.officerRank || '—'}</div>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              )}
 
-              {/* Respondents */}
-              <div className="px-7 py-5 border-b border-white/8">
-                <div className="flex items-center gap-2 mb-4">
-                  <Users className="w-4 h-4 text-[#C9A15E]" />
-                  <h4 className="text-[11px] font-bold text-[#8590A8] uppercase tracking-widest">
-                    Respondents ({viewingEntry.respondents?.length || 0})
-                  </h4>
+              {/* ── Section II: Respondent Details ── */}
+              {(modalTab === 'all' || modalTab === 'sec2') && (
+                <div className="bg-white rounded-xl p-5 border border-[#E2D9C2] shadow-sm">
+                  <div className="flex items-center gap-2 mb-4 pb-2.5 border-b border-[#EFE8D8]">
+                    <span className="font-mono text-[12px] font-bold text-white bg-[#000E89] px-2 py-0.5 rounded shadow-2xs">II.</span>
+                    <h4 className="text-[14px] font-serif font-bold text-ink-text uppercase tracking-wide">
+                      Respondent Details ({viewingEntry.respondents?.length || 0})
+                    </h4>
+                  </div>
+                  {(!viewingEntry.respondents || viewingEntry.respondents.length === 0) ? (
+                    <div className="text-[12.5px] text-ink-text-faint italic py-2">No respondents added.</div>
+                  ) : (
+                    <div className="border border-[#E2D9C2] rounded-lg overflow-hidden">
+                      <table className="data-table">
+                        <thead>
+                          <tr>
+                            <th className="w-10 text-center">#</th>
+                            <th>Respondent</th>
+                            <th>Office</th>
+                            <th>Department</th>
+                            <th>Sub Department</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {viewingEntry.respondents.map((r, i) => (
+                            <tr key={r.id || i}>
+                              <td className="text-center font-mono font-semibold text-ink-text-soft">{i + 1}</td>
+                              <td>
+                                <div className="font-bold text-ink-text text-[13px]">{r.name}</div>
+                                {r.designation && <div className="text-[11.5px] text-ink-text-soft">{r.designation}</div>}
+                              </td>
+                              <td><span className="text-[12.5px]">{r.office || '—'}</span></td>
+                              <td><span className="text-[12.5px] font-medium">{r.department || '—'}</span></td>
+                              <td><span className="text-[12.5px] text-ink-text-soft">{r.subDepartment || '—'}</span></td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
-                {(!viewingEntry.respondents || viewingEntry.respondents.length === 0) ? (
-                  <p className="text-[13px] text-[#536089] italic">No respondents recorded.</p>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {viewingEntry.respondents.map(r => (
-                      <div key={r.id} className="flex items-start gap-3 p-4 bg-white/4 border border-white/8 rounded-xl hover:border-white/15 transition-colors">
-                        <div className="w-9 h-9 rounded-lg bg-[#C9A15E]/15 border border-[#C9A15E]/20 flex items-center justify-center flex-shrink-0">
-                          <span className="text-[11px] font-bold text-[#C9A15E]">
-                            {r.name.split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase()}
-                          </span>
+              )}
+
+              {/* ── Section III: 17-A Proposal ── */}
+              {(modalTab === 'all' || modalTab === 'sec3') && (
+                <div className="bg-white rounded-xl p-5 border border-[#E2D9C2] shadow-sm">
+                  <div className="flex items-center justify-between mb-4 pb-2.5 border-b border-[#EFE8D8]">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-[12px] font-bold text-white bg-[#000E89] px-2 py-0.5 rounded shadow-2xs">III.</span>
+                      <h4 className="text-[14px] font-serif font-bold text-ink-text uppercase tracking-wide">17-A Proposal</h4>
+                    </div>
+                    {renderProposalBadge(viewingEntry.proposalStatus)}
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-[13px]">
+                    <div>
+                      <span className="text-[11.5px] font-bold text-ink-text-soft block mb-1">Proposal Status</span>
+                      <div className="font-semibold text-ink-text">{viewingEntry.proposalStatus || '—'}</div>
+                    </div>
+                    <div>
+                      <span className="text-[11.5px] font-bold text-ink-text-soft block mb-1">Date Sent to CA</span>
+                      <div className="font-semibold text-ink-text flex items-center gap-1.5">
+                        <Calendar className="w-3.5 h-3.5 text-brass" />
+                        {formatDate(viewingEntry.proposalSentDate)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ── Section IV: Competent Authority (Per Respondent) ── */}
+              {(modalTab === 'all' || modalTab === 'sec4') && (
+                <div className="bg-white rounded-xl p-5 border border-[#E2D9C2] shadow-sm">
+                  <div className="flex items-center gap-2 mb-4 pb-2.5 border-b border-[#EFE8D8]">
+                    <span className="font-mono text-[12px] font-bold text-white bg-[#000E89] px-2 py-0.5 rounded shadow-2xs">IV.</span>
+                    <h4 className="text-[14px] font-serif font-bold text-ink-text uppercase tracking-wide">Competent Authority (Per Respondent)</h4>
+                  </div>
+                  {(!viewingEntry.respondents || viewingEntry.respondents.length === 0) ? (
+                    <div className="text-[12.5px] text-ink-text-faint italic py-2">No respondents registered.</div>
+                  ) : (
+                    <div className="border border-[#E2D9C2] rounded-lg overflow-hidden">
+                      <table className="data-table">
+                        <thead>
+                          <tr>
+                            <th className="w-10 text-center">#</th>
+                            <th>Respondent</th>
+                            <th>CA Designation</th>
+                            <th>CA Department</th>
+                            <th>CA Sub Department</th>
+                            <th>CA Office / Place</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {viewingEntry.respondents.map((r, i) => (
+                            <tr key={r.id || i}>
+                              <td className="text-center font-mono font-semibold text-ink-text-soft">{i + 1}</td>
+                              <td>
+                                <div className="font-bold text-ink-text text-[13px]">{r.name}</div>
+                                {r.designation && <div className="text-[11.5px] text-ink-text-soft">{r.designation}</div>}
+                              </td>
+                              <td><span className="text-[12.5px] font-semibold text-[#000E89]">{r.caDesignation || '—'}</span></td>
+                              <td><span className="text-[12.5px] font-medium">{r.caDepartment || '—'}</span></td>
+                              <td><span className="text-[12.5px] text-ink-text-soft">{r.caSubDepartment || '—'}</span></td>
+                              <td><span className="text-[12.5px]">{r.caPlace || '—'}</span></td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── Section V: 17-A Permission (Per Respondent) ── */}
+              {(modalTab === 'all' || modalTab === 'sec5') && (
+                <div className="bg-white rounded-xl p-5 border border-[#E2D9C2] shadow-sm">
+                  <div className="flex items-center gap-2 mb-4 pb-2.5 border-b border-[#EFE8D8]">
+                    <span className="font-mono text-[12px] font-bold text-white bg-[#000E89] px-2 py-0.5 rounded shadow-2xs">V.</span>
+                    <h4 className="text-[14px] font-serif font-bold text-ink-text uppercase tracking-wide">17-A Permission (Per Respondent)</h4>
+                  </div>
+                  {(!viewingEntry.respondents || viewingEntry.respondents.length === 0) ? (
+                    <div className="text-[12.5px] text-ink-text-faint italic py-2">No respondents registered.</div>
+                  ) : (
+                    <div className="border border-[#E2D9C2] rounded-lg overflow-hidden">
+                      <table className="data-table">
+                        <thead>
+                          <tr>
+                            <th className="w-10 text-center">#</th>
+                            <th>Respondent</th>
+                            <th>Status</th>
+                            <th>Sent Date</th>
+                            <th>Permission Received from CA</th>
+                            <th>CA Sent to Unit</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {viewingEntry.respondents.map((r, i) => (
+                            <tr key={r.id || i}>
+                              <td className="text-center font-mono font-semibold text-ink-text-soft">{i + 1}</td>
+                              <td>
+                                <div className="font-bold text-ink-text text-[13px]">{r.name}</div>
+                                {r.designation && <div className="text-[11.5px] text-ink-text-soft">{r.designation}</div>}
+                              </td>
+                              <td>{renderPermissionBadge(r.permissionStatus)}</td>
+                              <td className="font-mono text-[12px]">{formatDate(r.permissionSentDate)}</td>
+                              <td className="font-mono text-[12px]">{formatDate(r.permissionReceivedFromCA)}</td>
+                              <td className="font-mono text-[12px]">{formatDate(r.caSentToUnit)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── Section VI: Preliminary Enquiry (PE) ── */}
+              {(modalTab === 'all' || modalTab === 'sec6') && (
+                <div className="bg-white rounded-xl p-5 border border-[#E2D9C2] shadow-sm">
+                  <div className="flex items-center justify-between mb-4 pb-2.5 border-b border-[#EFE8D8]">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-[12px] font-bold text-white bg-[#000E89] px-2 py-0.5 rounded shadow-2xs">VI.</span>
+                      <h4 className="text-[14px] font-serif font-bold text-ink-text uppercase tracking-wide">Preliminary Enquiry</h4>
+                    </div>
+                    {renderPeStatusBadge(viewingEntry.peStatus)}
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-[13px]">
+                    <div>
+                      <span className="text-[11.5px] font-bold text-ink-text-soft block mb-1">PE No</span>
+                      <div className="font-mono font-bold text-[#000E89] bg-[#E8EEF9] border border-[#CBD8EF] px-2 py-0.5 rounded inline-block">
+                        {viewingEntry.peNo ? `PE #${viewingEntry.peNo}` : '—'}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-[11.5px] font-bold text-ink-text-soft block mb-1">PE Status</span>
+                      <div className="font-semibold text-ink-text">{viewingEntry.peStatus || '—'}</div>
+                    </div>
+                    <div>
+                      <span className="text-[11.5px] font-bold text-ink-text-soft block mb-1">Date of PE Registration</span>
+                      <div className="font-semibold text-ink-text flex items-center gap-1.5">
+                        <Calendar className="w-3.5 h-3.5 text-brass" />
+                        {formatDate(viewingEntry.peRegDate)}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-[11.5px] font-bold text-ink-text-soft block mb-1">Date of PE report sent to HQ</span>
+                      <div className="font-semibold text-ink-text flex items-center gap-1.5">
+                        <Calendar className="w-3.5 h-3.5 text-brass" />
+                        {formatDate(viewingEntry.peReportSentDate)}
+                      </div>
+                    </div>
+                    <div className="sm:col-span-2 lg:col-span-2">
+                      <span className="text-[11.5px] font-bold text-ink-text-soft block mb-1">PE EO (Enquiry Officer)</span>
+                      <div className="font-semibold text-ink-text">{viewingEntry.sirEo || '—'}</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ── Diary Remarks & Chronology ── */}
+              {(modalTab === 'all' || modalTab === 'remarks') && viewingEntry.remarks?.length > 0 && (
+                <div className="bg-white rounded-xl p-5 border border-[#E2D9C2] shadow-sm">
+                  <div className="flex items-center gap-2 mb-4 pb-2.5 border-b border-[#EFE8D8]">
+                    <MessageSquare className="w-4 h-4 text-brass" />
+                    <h4 className="text-[14px] font-serif font-bold text-ink-text uppercase tracking-wide">Diary Remarks & Chronology</h4>
+                  </div>
+                  <div className="space-y-3">
+                    {viewingEntry.remarks.map((rm, idx) => (
+                      <div key={rm.id || idx} className="bg-[#FAF8F2] border border-[#E2D9C2] rounded-lg p-3 text-[12.5px]">
+                        <div className="font-bold text-[#000E89] mb-1 flex items-center gap-1">
+                          <Calendar className="w-3 h-3 text-brass" />
+                          {formatDate(rm.date)}
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex justify-between items-start mb-1">
-                            <div className="font-semibold text-[13px] text-[#E8EEF5] truncate pr-2">{r.name}</div>
-                            {renderPermissionBadge(r.permissionStatus)}
-                          </div>
-                          <div className="text-[11.5px] text-[#8590A8] truncate">
-                            {[r.designation, r.department].filter(Boolean).join(' · ')}
-                          </div>
-                          {(r.caDesignation || r.caDepartment || r.caPlace) && (
-                            <div className="text-[10.5px] text-[#536089] bg-white/5 px-2 py-1 rounded border border-white/10 mt-1.5 truncate">
-                              <span className="font-semibold text-[#8590A8] mr-1">CA:</span>
-                              {[r.caDesignation, r.caDepartment, r.caPlace].filter(Boolean).join(', ')}
-                            </div>
-                          )}
-                        </div>
+                        <p className="text-ink-text whitespace-pre-line">{rm.text}</p>
                       </div>
                     ))}
                   </div>
-                )}
-              </div>
-
-              {/* Remarks */}
-              <div className="px-7 py-5">
-                <div className="flex items-center gap-2 mb-4">
-                  <MessageSquare className="w-4 h-4 text-[#C9A15E]" />
-                  <h4 className="text-[11px] font-bold text-[#8590A8] uppercase tracking-widest">
-                    Remarks ({viewingEntry.remarks?.length || 0})
-                  </h4>
                 </div>
-                {(!viewingEntry.remarks || viewingEntry.remarks.length === 0) ? (
-                  <p className="text-[13px] text-[#536089] italic">No remarks recorded yet.</p>
-                ) : (
-                  <ul className="space-y-3">
-                    {viewingEntry.remarks.map((rm) => (
-                      <li key={rm.id} className="flex gap-3">
-                        <div className="w-9 h-9 rounded-lg bg-white/5 border border-white/10 flex flex-col items-center justify-center flex-shrink-0">
-                          <div className="text-[11px] font-bold text-[#C9A15E] leading-none">{new Date(rm.date).getDate()}</div>
-                          <div className="text-[8.5px] uppercase font-semibold text-[#536089] leading-none mt-0.5">
-                            {new Date(rm.date).toLocaleDateString('en-IN', { month: 'short' })}
-                          </div>
-                        </div>
-                        <div className="flex-1 bg-white/4 rounded-xl p-3.5 border border-white/8">
-                          <div className="text-[11px] text-[#536089] mb-1 font-medium">{formatDate(rm.date)}</div>
-                          <div className="text-[13px] text-[#C5D0E0] leading-relaxed">{rm.text}</div>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
+              )}
+
             </div>
 
             {/* Modal Footer */}
-            <div className="bg-[#0D1627] border-t border-white/10 px-7 py-4 flex justify-between items-center flex-shrink-0">
-              <div className="text-[11px] text-[#536089] font-mono">
-                Created: {formatDate(viewingEntry.createdAt)}
+            <div className="bg-[#F0ECE1] border-t border-[#DFD6C2] px-7 py-3.5 flex justify-between items-center flex-shrink-0">
+              <div className="text-[12px] text-ink-text-soft font-mono flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                Case ID: <span className="font-bold text-ink-text">{viewingEntry.id}</span>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2.5">
                 <button
                   type="button"
-                  className="btn btn-secondary py-2 px-4 text-[13px]"
+                  className="btn btn-secondary py-2 px-4 text-[13px] bg-white border-[#D5CCA8] text-ink-text hover:bg-parchment-2"
                   onClick={() => setViewingEntry(null)}
                 >
                   Close
                 </button>
                 {(role === 'admin' || viewingEntry.createdById === currentUserId || viewingEntry.createdBy?.supervisorUserId === currentUserId) && (
                   <button
-                    className="btn btn-primary py-2 px-5 text-[13px]"
+                    className="btn btn-primary py-2 px-5 text-[13px] shadow-sm flex items-center gap-1.5"
                     onClick={() => { navigate(`/register/${viewingEntry.id}/edit`); setViewingEntry(null); }}
                   >
                     <Pencil className="w-3.5 h-3.5" />
@@ -564,6 +1072,7 @@ export default function RegisterList() {
                 )}
               </div>
             </div>
+
           </div>
         )}
       </Modal>

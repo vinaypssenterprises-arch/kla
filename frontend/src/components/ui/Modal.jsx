@@ -2,29 +2,43 @@ import React, { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 
 export default function Modal({ open, onClose, children, overlayClassName = '', closeOnBackdrop = true }) {
-  const firstFocusableRef = useRef(null);
   const previousFocusRef = useRef(null);
+  const onCloseRef = useRef(onClose);
+
+  // Keep latest onClose in a ref so we never re-trigger effects on parent re-renders
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     if (!open) return;
 
-    // Save currently focused element and lock body scroll
+    // Save currently focused element BEFORE modal opened and lock body scroll
     previousFocusRef.current = document.activeElement;
     document.body.classList.add('modal-open');
 
-    // Focus first focusable element inside modal after animation settles
+    // Only set initial focus if focus is not already inside the modal
     const timer = setTimeout(() => {
       const modal = document.getElementById('modal-content-root');
-      if (modal) {
-        const focusable = modal.querySelectorAll(
-          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-        );
-        if (focusable.length > 0) focusable[0].focus();
+      if (modal && !modal.contains(document.activeElement)) {
+        // Look for autoFocus or input elements first before close buttons
+        const primaryInput = modal.querySelector('input:not([disabled]), textarea:not([disabled])');
+        if (primaryInput) {
+          primaryInput.focus();
+        } else {
+          const focusable = modal.querySelectorAll(
+            'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+          );
+          if (focusable.length > 0) focusable[0].focus();
+        }
       }
-    }, 60);
+    }, 50);
 
     const handleKeyDown = (e) => {
-      if (e.key === 'Escape') { onClose?.(); return; }
+      if (e.key === 'Escape') {
+        onCloseRef.current?.();
+        return;
+      }
 
       // Focus trap
       if (e.key === 'Tab') {
@@ -37,36 +51,40 @@ export default function Modal({ open, onClose, children, overlayClassName = '', 
         const first = focusable[0];
         const last = focusable[focusable.length - 1];
         if (e.shiftKey && document.activeElement === first) {
-          e.preventDefault(); last.focus();
+          e.preventDefault();
+          last.focus();
         } else if (!e.shiftKey && document.activeElement === last) {
-          e.preventDefault(); first.focus();
+          e.preventDefault();
+          first.focus();
         }
       }
     };
 
     document.addEventListener('keydown', handleKeyDown);
+
     return () => {
       clearTimeout(timer);
       document.body.classList.remove('modal-open');
       document.removeEventListener('keydown', handleKeyDown);
-      // Restore previous focus on close
-      if (previousFocusRef.current?.focus) {
-        previousFocusRef.current.focus();
+      // Restore previous focus only when the modal unmounts / closes
+      const prev = previousFocusRef.current;
+      if (prev && typeof prev.focus === 'function') {
+        try {
+          prev.focus();
+        } catch {
+          // ignore
+        }
       }
     };
-  }, [open, onClose]);
+  }, [open]); // CRITICAL: Only run when open transitions, NEVER when onClose or children change!
 
   if (!open) return null;
 
-  // Rendered via a portal straight onto <body> — several trigger points (e.g. the sidebar,
-  // which has an always-on Tailwind translate-x transform) sit inside an ancestor with a
-  // CSS transform, and a transformed ancestor becomes the containing block for `fixed`
-  // descendants, which would otherwise box this overlay into that ancestor instead of the viewport.
   return createPortal(
     <div
       className={`fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 overflow-y-auto ${overlayClassName || 'bg-black/55 backdrop-blur-[3px]'}`}
       style={{ animation: 'backdropIn 0.2s ease-out' }}
-      onClick={closeOnBackdrop ? onClose : undefined}
+      onClick={closeOnBackdrop ? () => onCloseRef.current?.() : undefined}
     >
       <div
         id="modal-content-root"
