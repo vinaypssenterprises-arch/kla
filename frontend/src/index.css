@@ -225,6 +225,20 @@
     border-bottom: none;
   }
 
+  /* Distinct Case Row Boundaries in Register Table */
+  .data-table tbody tr.case-row-even td {
+    background-color: #F8FAFD;
+  }
+  .data-table tbody tr.case-row-odd td {
+    background-color: #FFFFFF;
+  }
+  .data-table tbody tr.case-row td {
+    border-bottom: 2.5px solid #CBD8EF !important;
+  }
+  .data-table tbody tr.case-row:hover td {
+    background-color: #EEF4FD !important;
+  }
+
   /* Stamps / Official Seal Badges */
   .stamp {
     @apply inline-flex items-center justify-center py-1 px-[11px] border-[1.5px] border-current rounded font-mono text-[10px] font-semibold tracking-[0.05em] uppercase relative -rotate-[1.2deg] whitespace-nowrap select-none;

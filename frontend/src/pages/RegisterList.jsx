@@ -344,7 +344,7 @@ export default function RegisterList() {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th className="w-[52px] text-center">#</th>
+                  <th className="w-[64px] text-center">Case #</th>
                   <th className="min-w-[130px]">District</th>
                   <th className="min-w-[170px]">Petition No.</th>
                   <th className="min-w-[170px]">Petitioner</th>
@@ -364,11 +364,20 @@ export default function RegisterList() {
                     <tr
                       key={entry.id}
                       onClick={() => handleOpenView(entry)}
-                      className="group"
+                      className={`group transition-all duration-150 cursor-pointer case-row ${
+                        idx % 2 === 0 ? 'case-row-odd' : 'case-row-even'
+                      }`}
                     >
-                      {/* Sl.No */}
-                      <td className="text-center font-mono text-[12px] font-semibold text-ink-text-soft/80">
-                        {(page - 1) * pageSize + idx + 1}
+                      {/* Case Number Badge */}
+                      <td className="text-center px-2 py-3 align-middle">
+                        <div className="flex flex-col items-center justify-center gap-0.5">
+                          <span className="inline-flex items-center justify-center min-w-[28px] h-7 px-1.5 rounded-md bg-[#000E89] text-white font-mono text-[12px] font-bold shadow-xs">
+                            {(page - 1) * pageSize + idx + 1}
+                          </span>
+                          <span className="text-[9px] font-bold tracking-wider text-[#7C88A2] uppercase">
+                            Case
+                          </span>
+                        </div>
                       </td>
 
                       {/* District */}
@@ -476,61 +485,29 @@ export default function RegisterList() {
                         </div>
                       </td>
 
-                      {/* PE No. & Date */}
-                      <td className="p-0 align-top">
-                        <div className="divide-y divide-[#E2D9C2]">
-                          {entry.respondents?.length > 0 ? (
-                            entry.respondents.map((r, i) => (
-                              <div key={r.id || i} className="min-h-[46px] px-3.5 py-1.5 flex flex-col justify-center items-start">
-                                {entry.peNo ? (
-                                  <span className="font-mono text-[11px] font-bold text-[#000E89] bg-[#E8EEF9] border border-[#CBD8EF] px-1.5 py-0.5 rounded shadow-2xs">
-                                    PE #{entry.peNo}
-                                  </span>
-                                ) : (
-                                  <span className="text-[11.5px] text-ink-text-faint/60 italic font-mono">—</span>
-                                )}
-                                {entry.peRegDate && (
-                                  <span className="text-[10px] text-ink-text-soft flex items-center gap-1 mt-0.5 font-mono">
-                                    <Calendar className="w-2.5 h-2.5 text-brass flex-shrink-0" />
-                                    {formatDate(entry.peRegDate)}
-                                  </span>
-                                )}
-                              </div>
-                            ))
+                      {/* PE No. & Date - displayed ONCE per petition */}
+                      <td className="px-3.5 py-3 align-middle text-center">
+                        <div className="flex flex-col items-center justify-center gap-1">
+                          {entry.peNo ? (
+                            <span className="font-mono text-[11px] font-bold text-[#000E89] bg-[#E8EEF9] border border-[#CBD8EF] px-2 py-0.5 rounded shadow-2xs whitespace-nowrap">
+                              PE #{entry.peNo}
+                            </span>
                           ) : (
-                            <div className="min-h-[46px] px-3.5 py-1.5 flex flex-col justify-center items-start">
-                              {entry.peNo ? (
-                                <span className="font-mono text-[11px] font-bold text-[#000E89] bg-[#E8EEF9] border border-[#CBD8EF] px-1.5 py-0.5 rounded shadow-2xs">
-                                  PE #{entry.peNo}
-                                </span>
-                              ) : (
-                                <span className="text-[11.5px] text-ink-text-faint/60 italic font-mono">—</span>
-                              )}
-                              {entry.peRegDate && (
-                                <span className="text-[10px] text-ink-text-soft flex items-center gap-1 mt-0.5 font-mono">
-                                  <Calendar className="w-2.5 h-2.5 text-brass flex-shrink-0" />
-                                  {formatDate(entry.peRegDate)}
-                                </span>
-                              )}
-                            </div>
+                            <span className="text-[12px] text-ink-text-faint/60 italic font-mono">—</span>
+                          )}
+                          {entry.peRegDate && (
+                            <span className="text-[10px] text-ink-text-soft flex items-center gap-1 font-mono whitespace-nowrap">
+                              <Calendar className="w-2.5 h-2.5 text-brass flex-shrink-0" />
+                              {formatDate(entry.peRegDate)}
+                            </span>
                           )}
                         </div>
                       </td>
 
-                      {/* PE Status (aligned per respondent with divider lines) */}
-                      <td className="p-0 align-top">
-                        <div className="divide-y divide-[#E2D9C2]">
-                          {entry.respondents?.length > 0 ? (
-                            entry.respondents.map((r, i) => (
-                              <div key={r.id || i} className="min-h-[46px] px-4 py-2 flex items-center">
-                                {renderPeStatusBadge(entry.peStatus)}
-                              </div>
-                            ))
-                          ) : (
-                            <div className="min-h-[46px] px-4 py-2 flex items-center">
-                              {renderPeStatusBadge(entry.peStatus)}
-                            </div>
-                          )}
+                      {/* PE Status - displayed ONCE per petition */}
+                      <td className="px-3.5 py-3 align-middle text-center">
+                        <div className="flex items-center justify-center">
+                          {renderPeStatusBadge(entry.peStatus)}
                         </div>
                       </td>
 
