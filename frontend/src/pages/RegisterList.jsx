@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Search, Plus, ArchiveX, Eye, Pencil, Trash2, X, Download,
   FileText, Calendar, Users, MessageSquare, MapPin, CheckCircle2,
-  ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronDown,
+  ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronDown, ChevronUp,
   AlertCircle, Clock, Gavel, Shield, Building2, SlidersHorizontal, FileDown,
   Settings2
 } from 'lucide-react';
@@ -28,7 +28,12 @@ export default function RegisterList() {
   const [deletingId, setDeletingId] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [actionMenu, setActionMenu] = useState(null);
+  const [expandedCases, setExpandedCases] = useState({});
   const { showError, showSuccess } = useToast();
+
+  const toggleExpandCase = (id) => {
+    setExpandedCases(prev => ({ ...prev, [id]: !prev[id] }));
+  };
 
   // Pagination & filters
   const [page, setPage] = useState(1);
@@ -132,15 +137,15 @@ export default function RegisterList() {
       return;
     }
     const rect = e.currentTarget.getBoundingClientRect();
-    const right = Math.max(12, window.innerWidth - rect.right);
+    const left = Math.max(12, rect.left);
     const top = rect.bottom + 6;
-    const openUpwards = top + 160 > window.innerHeight;
+    const openUpwards = top + 180 > window.innerHeight;
     setActionMenu({
       id: entry.id,
       entry,
       top: openUpwards ? undefined : top,
       bottom: openUpwards ? window.innerHeight - rect.top + 6 : undefined,
-      right,
+      left,
     });
   };
 
@@ -229,7 +234,7 @@ export default function RegisterList() {
     <>
       {Array.from({ length: pageSize > 10 ? 8 : pageSize }).map((_, i) => (
         <tr key={i} className="pointer-events-none">
-          {[40, 90, 140, 130, 170, 80, 80, 100, 80, 48].map((w, j) => (
+          {[40, 48, 90, 140, 130, 170, 80, 80, 100, 80].map((w, j) => (
             <td key={j} className="py-3.5 px-3">
               <div className={`h-4 skeleton-line rounded mx-auto`} style={{ width: w }} />
             </td>
@@ -348,7 +353,8 @@ export default function RegisterList() {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th className="w-[64px] text-center">Case #</th>
+                  <th className="w-[60px] text-center">Case #</th>
+                  <th className="w-[56px] text-center">Action</th>
                   <th className="min-w-[130px]">District</th>
                   <th className="min-w-[170px]">Petition No.</th>
                   <th className="min-w-[170px]">Petitioner</th>
@@ -357,181 +363,230 @@ export default function RegisterList() {
                   <th className="min-w-[120px]">Permission</th>
                   <th className="min-w-[140px]">PE No. & Date</th>
                   <th className="min-w-[130px]">PE Status</th>
-                  <th className="w-20 text-center">Action</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <SkeletonRows />
                 ) : (
-                  entries.map((entry, idx) => (
-                    <tr
-                      key={entry.id}
-                      onClick={() => handleOpenView(entry)}
-                      className={`group transition-all duration-150 cursor-pointer case-row ${
-                        idx % 2 === 0 ? 'case-row-odd' : 'case-row-even'
-                      }`}
-                    >
-                      {/* Case Number Badge */}
-                      <td className="text-center px-2 py-3 align-middle">
-                        <div className="flex flex-col items-center justify-center gap-0.5">
-                          <span className="inline-flex items-center justify-center min-w-[28px] h-7 px-1.5 rounded-md bg-[#000E89] text-white font-mono text-[12px] font-bold shadow-xs">
-                            {(page - 1) * pageSize + idx + 1}
-                          </span>
-                          <span className="text-[9px] font-bold tracking-wider text-[#7C88A2] uppercase">
-                            Case
-                          </span>
-                        </div>
-                      </td>
+                  entries.map((entry, idx) => {
+                    const respondents = entry.respondents || [];
+                    const hasMoreRespondents = respondents.length > 3;
+                    const isExpanded = !!expandedCases[entry.id];
+                    const visibleRespondents = hasMoreRespondents && !isExpanded
+                      ? respondents.slice(0, 3)
+                      : respondents;
 
-                      {/* District */}
-                      <td className="whitespace-nowrap">
-                        <div className="flex items-center gap-1.5 font-semibold text-ink-text text-[13px]">
-                          <MapPin className="w-3.5 h-3.5 text-brass flex-shrink-0" />
-                          <span>{entry.district || '—'}</span>
-                        </div>
-                      </td>
-
-                      {/* Petition No. */}
-                      <td>
-                        <div className="flex flex-col items-start gap-1">
-                          <span
-                            className="inline-flex items-center gap-1.5 font-mono text-[12px] font-bold text-[#000E89] bg-[#E8EEF9] border border-[#CBD8EF] px-2.5 py-1 rounded-md shadow-xs whitespace-nowrap"
-                            title={entry.petitionNo}
-                          >
-                            <FileText className="w-3.5 h-3.5 text-[#000E89]/70 flex-shrink-0" />
-                            {entry.petitionNo}
-                          </span>
-                          {entry.type && (
-                            <span className={`inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded border ${
-                              (entry.type || '').toLowerCase().includes('suo')
-                                ? 'bg-purple-50 text-purple-700 border-purple-200'
-                                : 'bg-slate-50 text-slate-600 border-slate-200'
-                            }`}>
-                              {entry.type}
+                    return (
+                      <tr
+                        key={entry.id}
+                        onClick={() => handleOpenView(entry)}
+                        className={`group transition-all duration-150 cursor-pointer case-row ${
+                          idx % 2 === 0 ? 'case-row-odd' : 'case-row-even'
+                        }`}
+                      >
+                        {/* Case Number Badge */}
+                        <td className="text-center px-2 py-3 align-middle">
+                          <div className="flex flex-col items-center justify-center gap-0.5">
+                            <span className="inline-flex items-center justify-center min-w-[28px] h-7 px-1.5 rounded-md bg-[#000E89] text-white font-mono text-[12px] font-bold shadow-xs">
+                              {(page - 1) * pageSize + idx + 1}
                             </span>
-                          )}
-                        </div>
-                      </td>
-
-                      {/* Petitioner */}
-                      <td className="max-w-[200px]">
-                        <div className="font-semibold text-ink-text text-[13px] leading-snug line-clamp-2" title={entry.petitionerName}>
-                          {entry.petitionerName}
-                        </div>
-                        {entry.petitionerAddress && (
-                          <div className="text-[11px] text-ink-text-faint truncate mt-0.5" title={entry.petitionerAddress}>
-                            {entry.petitionerAddress}
+                            <span className="text-[9px] font-bold tracking-wider text-[#7C88A2] uppercase">
+                              Case
+                            </span>
                           </div>
-                        )}
-                      </td>
+                        </td>
 
-                      {/* Respondents (clean professional sub-rows with dividing lines) */}
-                      <td className="p-0 align-top">
-                        <div className="divide-y divide-[#E2D9C2]">
-                          {entry.respondents?.length > 0 ? (
-                            entry.respondents.map((r, i) => (
-                              <div
-                                key={r.id || i}
-                                className="min-h-[46px] px-4 py-2 flex items-center gap-2 text-[12.5px] leading-tight"
-                                title={`${r.name}${r.designation ? ` (${r.designation})` : ''}${r.department ? ` · ${r.department}` : ''}`}
-                              >
-                                <span className="w-5 h-5 rounded-full bg-[#EAE4D2] text-[#4A3E25] text-[10px] font-bold flex items-center justify-center flex-shrink-0 shadow-2xs border border-[#DDD5BE]">
-                                  {i + 1}
-                                </span>
-                                <span className="font-semibold text-ink-text truncate">{r.name}</span>
-                                {r.designation && (
-                                  <span className="text-[11.5px] text-ink-text-soft truncate font-normal">
-                                    · {r.designation}
-                                  </span>
-                                )}
-                              </div>
-                            ))
-                          ) : (
-                            <div className="min-h-[46px] px-4 py-2 flex items-center text-[12px] text-ink-text-faint italic font-mono">
-                              —
+                        {/* Actions (placed immediately after Case # / SL No) */}
+                        <td onClick={e => e.stopPropagation()} className="text-center px-2 align-middle">
+                          <button
+                            type="button"
+                            className={`w-7 h-7 rounded-lg inline-flex items-center justify-center transition-all border ${
+                              actionMenu?.id === entry.id
+                                ? 'bg-[#000E89] text-white border-[#000E89] shadow-xs'
+                                : 'bg-[#F4F7FC] hover:bg-[#000E89] text-[#000E89] hover:text-white border-[#CBD8EF]'
+                            }`}
+                            title="Manage Case"
+                            onClick={(e) => handleToggleActionMenu(e, entry)}
+                          >
+                            <Settings2 className="w-4 h-4" />
+                          </button>
+                        </td>
+
+                        {/* District */}
+                        <td className="whitespace-nowrap">
+                          <div className="flex items-center gap-1.5 font-semibold text-ink-text text-[13px]">
+                            <MapPin className="w-3.5 h-3.5 text-brass flex-shrink-0" />
+                            <span>{entry.district || '—'}</span>
+                          </div>
+                        </td>
+
+                        {/* Petition No. */}
+                        <td>
+                          <div className="flex flex-col items-start gap-1">
+                            <span
+                              className="inline-flex items-center gap-1.5 font-mono text-[12px] font-bold text-[#000E89] bg-[#E8EEF9] border border-[#CBD8EF] px-2.5 py-1 rounded-md shadow-xs whitespace-nowrap"
+                              title={entry.petitionNo}
+                            >
+                              <FileText className="w-3.5 h-3.5 text-[#000E89]/70 flex-shrink-0" />
+                              {entry.petitionNo}
+                            </span>
+                            {entry.type && (
+                              <span className={`inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded border ${
+                                (entry.type || '').toLowerCase().includes('suo')
+                                  ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                  : 'bg-slate-50 text-slate-600 border-slate-200'
+                              }`}>
+                                {entry.type}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* Petitioner */}
+                        <td className="max-w-[200px]">
+                          <div className="font-semibold text-ink-text text-[13px] leading-snug line-clamp-2" title={entry.petitionerName}>
+                            {entry.petitionerName}
+                          </div>
+                          {entry.petitionerAddress && (
+                            <div className="text-[11px] text-ink-text-faint truncate mt-0.5" title={entry.petitionerAddress}>
+                              {entry.petitionerAddress}
                             </div>
                           )}
-                        </div>
-                      </td>
+                        </td>
 
-                      {/* Proposal (aligned per respondent with divider lines) */}
-                      <td className="p-0 align-top">
-                        <div className="divide-y divide-[#E2D9C2]">
-                          {entry.respondents?.length > 0 ? (
-                            entry.respondents.map((r, i) => (
-                              <div key={r.id || i} className="min-h-[46px] px-4 py-2 flex items-center">
+                        {/* Respondents (clean professional sub-rows, collapsed to 3 if >3) */}
+                        <td className="p-0 align-top">
+                          <div className="divide-y divide-[#E2D9C2]">
+                            {visibleRespondents.length > 0 ? (
+                              visibleRespondents.map((r, i) => (
+                                <div
+                                  key={r.id || i}
+                                  className="min-h-[46px] px-4 py-2 flex items-center gap-2 text-[12.5px] leading-tight"
+                                  title={`${r.name}${r.designation ? ` (${r.designation})` : ''}${r.department ? ` · ${r.department}` : ''}`}
+                                >
+                                  <span className="w-5 h-5 rounded-full bg-[#EAE4D2] text-[#4A3E25] text-[10px] font-bold flex items-center justify-center flex-shrink-0 shadow-2xs border border-[#DDD5BE]">
+                                    {i + 1}
+                                  </span>
+                                  <span className="font-semibold text-ink-text truncate">{r.name}</span>
+                                  {r.designation && (
+                                    <span className="text-[11.5px] text-ink-text-soft truncate font-normal">
+                                      · {r.designation}
+                                    </span>
+                                  )}
+                                </div>
+                              ))
+                            ) : (
+                              <div className="min-h-[46px] px-4 py-2 flex items-center text-[12px] text-ink-text-faint italic font-mono">
+                                —
+                              </div>
+                            )}
+                          </div>
+                          {hasMoreRespondents && (
+                            <div className="p-1.5 bg-[#FAF6EC]/90 border-t border-[#E2D9C2] flex items-center justify-center">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleExpandCase(entry.id);
+                                }}
+                                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold text-[#000E89] hover:bg-[#000E89] hover:text-white transition-all shadow-xs border border-[#CBD8EF] bg-white group/exp cursor-pointer"
+                              >
+                                {isExpanded ? (
+                                  <>
+                                    <ChevronUp className="w-3.5 h-3.5 text-[#000E89] group-hover/exp:text-white transition-transform" />
+                                    <span>Show less</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <span className="w-4 h-4 rounded-full bg-[#000E89]/10 group-hover/exp:bg-white/20 text-[#000E89] group-hover/exp:text-white flex items-center justify-center text-[10px] font-bold">
+                                      +{respondents.length - 3}
+                                    </span>
+                                    <span>more</span>
+                                    <ChevronDown className="w-3.5 h-3.5 text-[#000E89] group-hover/exp:text-white transition-transform" />
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Proposal (aligned per respondent with divider lines) */}
+                        <td className="p-0 align-top">
+                          <div className="divide-y divide-[#E2D9C2]">
+                            {visibleRespondents.length > 0 ? (
+                              visibleRespondents.map((r, i) => (
+                                <div key={r.id || i} className="min-h-[46px] px-4 py-2 flex items-center">
+                                  {renderProposalBadge(entry.proposalStatus)}
+                                </div>
+                              ))
+                            ) : (
+                              <div className="min-h-[46px] px-4 py-2 flex items-center">
                                 {renderProposalBadge(entry.proposalStatus)}
                               </div>
-                            ))
-                          ) : (
-                            <div className="min-h-[46px] px-4 py-2 flex items-center">
-                              {renderProposalBadge(entry.proposalStatus)}
+                            )}
+                          </div>
+                          {hasMoreRespondents && (
+                            <div className="h-[37px] bg-[#FAF6EC]/40 border-t border-[#E2D9C2] flex items-center justify-center">
+                              <span className="text-[10px] text-ink-text-faint/60 font-mono italic">
+                                {isExpanded ? '—' : `+${respondents.length - 3}`}
+                              </span>
                             </div>
                           )}
-                        </div>
-                      </td>
+                        </td>
 
-                      {/* Permission (aligned per respondent with divider lines) */}
-                      <td className="p-0 align-top">
-                        <div className="divide-y divide-[#E2D9C2]">
-                          {entry.respondents?.length > 0 ? (
-                            entry.respondents.map((r, i) => (
-                              <div key={r.id || i} className="min-h-[46px] px-4 py-2 flex items-center">
-                                {renderPermissionBadge(r.permissionStatus)}
+                        {/* Permission (aligned per respondent with divider lines) */}
+                        <td className="p-0 align-top">
+                          <div className="divide-y divide-[#E2D9C2]">
+                            {visibleRespondents.length > 0 ? (
+                              visibleRespondents.map((r, i) => (
+                                <div key={r.id || i} className="min-h-[46px] px-4 py-2 flex items-center">
+                                  {renderPermissionBadge(r.permissionStatus)}
+                                </div>
+                              ))
+                            ) : (
+                              <div className="min-h-[46px] px-4 py-2 flex items-center text-[12px] text-ink-text-faint italic font-mono">
+                                —
                               </div>
-                            ))
-                          ) : (
-                            <div className="min-h-[46px] px-4 py-2 flex items-center text-[12px] text-ink-text-faint italic font-mono">
-                              —
+                            )}
+                          </div>
+                          {hasMoreRespondents && (
+                            <div className="h-[37px] bg-[#FAF6EC]/40 border-t border-[#E2D9C2] flex items-center justify-center">
+                              <span className="text-[10px] text-ink-text-faint/60 font-mono italic">
+                                {isExpanded ? '—' : `+${respondents.length - 3}`}
+                              </span>
                             </div>
                           )}
-                        </div>
-                      </td>
+                        </td>
 
-                      {/* PE No. & Date - displayed ONCE per petition */}
-                      <td className="px-3.5 py-3 align-middle text-center">
-                        <div className="flex flex-col items-center justify-center gap-1">
-                          {entry.peNo ? (
-                            <span className="font-mono text-[11px] font-bold text-[#000E89] bg-[#E8EEF9] border border-[#CBD8EF] px-2 py-0.5 rounded shadow-2xs whitespace-nowrap">
-                              PE #{entry.peNo}
-                            </span>
-                          ) : (
-                            <span className="text-[12px] text-ink-text-faint/60 italic font-mono">—</span>
-                          )}
-                          {entry.peRegDate && (
-                            <span className="text-[10px] text-ink-text-soft flex items-center gap-1 font-mono whitespace-nowrap">
-                              <Calendar className="w-2.5 h-2.5 text-brass flex-shrink-0" />
-                              {formatDate(entry.peRegDate)}
-                            </span>
-                          )}
-                        </div>
-                      </td>
+                        {/* PE No. & Date - displayed ONCE per petition */}
+                        <td className="px-3.5 py-3 align-middle text-center">
+                          <div className="flex flex-col items-center justify-center gap-1">
+                            {entry.peNo ? (
+                              <span className="font-mono text-[11px] font-bold text-[#000E89] bg-[#E8EEF9] border border-[#CBD8EF] px-2 py-0.5 rounded shadow-2xs whitespace-nowrap">
+                                PE #{entry.peNo}
+                              </span>
+                            ) : (
+                              <span className="text-[12px] text-ink-text-faint/60 italic font-mono">—</span>
+                            )}
+                            {entry.peRegDate && (
+                              <span className="text-[10px] text-ink-text-soft flex items-center gap-1 font-mono whitespace-nowrap">
+                                <Calendar className="w-2.5 h-2.5 text-brass flex-shrink-0" />
+                                {formatDate(entry.peRegDate)}
+                              </span>
+                            )}
+                          </div>
+                        </td>
 
-                      {/* PE Status - displayed ONCE per petition */}
-                      <td className="px-3.5 py-3 align-middle text-center">
-                        <div className="flex items-center justify-center">
-                          {renderPeStatusBadge(entry.peStatus)}
-                        </div>
-                      </td>
-
-                      {/* Actions */}
-                      <td onClick={e => e.stopPropagation()} className="text-center px-2">
-                        <button
-                          type="button"
-                          className={`w-7 h-7 rounded-lg inline-flex items-center justify-center transition-all border ${
-                            actionMenu?.id === entry.id
-                              ? 'bg-[#000E89] text-white border-[#000E89] shadow-xs'
-                              : 'bg-[#F4F7FC] hover:bg-[#000E89] text-[#000E89] hover:text-white border-[#CBD8EF]'
-                          }`}
-                          title="Manage Case"
-                          onClick={(e) => handleToggleActionMenu(e, entry)}
-                        >
-                          <Settings2 className="w-4 h-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))
+                        {/* PE Status - displayed ONCE per petition */}
+                        <td className="px-3.5 py-3 align-middle text-center">
+                          <div className="flex items-center justify-center">
+                            {renderPeStatusBadge(entry.peStatus)}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -587,7 +642,8 @@ export default function RegisterList() {
           style={{
             top: actionMenu.top !== undefined ? `${actionMenu.top}px` : 'auto',
             bottom: actionMenu.bottom !== undefined ? `${actionMenu.bottom}px` : 'auto',
-            right: `${actionMenu.right}px`,
+            left: actionMenu.left !== undefined ? `${actionMenu.left}px` : 'auto',
+            right: actionMenu.right !== undefined ? `${actionMenu.right}px` : 'auto',
           }}
           onClick={(e) => e.stopPropagation()}
         >
