@@ -1,5 +1,5 @@
 import { apiFetch } from '../lib/api';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { ArrowLeft, Save, Plus, X, Clock, CheckCircle2, AlertCircle } from 'lucide-react';
@@ -16,6 +16,8 @@ export default function FormPage() {
   const [districts, setDistricts] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [subDepartments, setSubDepartments] = useState([]);
+  const [peStatuses, setPeStatuses] = useState([]);
+  const [proposalStatuses, setProposalStatuses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const navigate = useNavigate();
@@ -34,7 +36,7 @@ export default function FormPage() {
 
     const districtsPromise = apiFetch(`/districts`, {  })
       .then(res => res.json())
-      .then(data => setDistricts(data.filter(d => d.isActive)))
+      .then(data => setDistricts(Array.isArray(data) ? data.filter(d => d.isActive) : []))
       .catch(err => console.error('Failed to load districts', err));
 
     const petitionPromise = isEdit
@@ -46,15 +48,32 @@ export default function FormPage() {
 
     const departmentsPromise = apiFetch(`/master-items/department`, {  })
       .then(res => res.json())
-      .then(data => setDepartments(data.filter(d => d.isActive)))
+      .then(data => setDepartments(Array.isArray(data) ? data.filter(d => d.isActive) : []))
       .catch(err => console.error('Failed to load departments', err));
 
     const subDepartmentsPromise = apiFetch(`/master-items/subDepartment`, {  })
       .then(res => res.json())
-      .then(data => setSubDepartments(data.filter(d => d.isActive)))
+      .then(data => setSubDepartments(Array.isArray(data) ? data.filter(d => d.isActive) : []))
       .catch(err => console.error('Failed to load subDepartments', err));
 
-    Promise.all([districtsPromise, departmentsPromise, subDepartmentsPromise, petitionPromise]).finally(() => setLoading(false));
+    const peStatusesPromise = apiFetch(`/master-items/peStatus`, {  })
+      .then(res => res.json())
+      .then(data => setPeStatuses(Array.isArray(data) ? data.filter(d => d.isActive) : []))
+      .catch(err => console.error('Failed to load peStatuses', err));
+
+    const proposalStatusesPromise = apiFetch(`/master-items/proposalStatus`, {  })
+      .then(res => res.json())
+      .then(data => setProposalStatuses(Array.isArray(data) ? data.filter(d => d.isActive) : []))
+      .catch(err => console.error('Failed to load proposalStatuses', err));
+
+    Promise.all([
+      districtsPromise,
+      departmentsPromise,
+      subDepartmentsPromise,
+      peStatusesPromise,
+      proposalStatusesPromise,
+      petitionPromise
+    ]).finally(() => setLoading(false));
   }, [id, isEdit]);
 
   if (loading) return (
@@ -66,10 +85,19 @@ export default function FormPage() {
   );
   if (isEdit && notFound) return <div className="min-h-[300px] flex items-center justify-center text-ink-text-soft">Petition not found.</div>;
 
-  return <PetitionWorkflow initialData={initialData} districts={districts} departments={departments} subDepartments={subDepartments} />;
+  return (
+    <PetitionWorkflow
+      initialData={initialData}
+      districts={districts}
+      departments={departments}
+      subDepartments={subDepartments}
+      peStatuses={peStatuses}
+      proposalStatuses={proposalStatuses}
+    />
+  );
 }
 
-function PetitionWorkflow({ initialData, districts, departments, subDepartments }) {
+function PetitionWorkflow({ initialData, districts, departments, subDepartments, peStatuses = [], proposalStatuses = [] }) {
   const navigate = useNavigate();
   const { showSuccess, showError } = useToast();
   const isEdit = !!initialData;
@@ -82,6 +110,17 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments 
   const isAdmin = localStorage.getItem('role') === 'admin';
   const isAdminNewPetition = isAdmin && !isEdit;
   const isAdminEdit = isAdmin && isEdit;
+
+  // Section Visibilities and Editability
+  const canEditIandII = isAdmin || status === 'DRAFT' || (status === '17A_RETURNED' && isCreator);
+  const showIII = isAdmin || (status !== 'DRAFT' && status !== '17A_RETURNED');
+  const canEditIII = isAdmin || ((status === 'SUBMITTED_TO_SUPERVISOR') && isSupervisor);
+  const showIV = isAdmin || ['17A_ACCEPTED', 'CA_SUBMITTED', '17A_PERMISSION_PENDING', '17A_PERMISSION_COMPLETED', 'PRELIMINARY_ENQUIRY_SUBMITTED'].includes(status);
+  const canEditIV = isAdmin || ((status === '17A_ACCEPTED') && isSupervisor);
+  const showV = isAdmin || ['CA_SUBMITTED', '17A_PERMISSION_PENDING', '17A_PERMISSION_COMPLETED', 'PRELIMINARY_ENQUIRY_SUBMITTED'].includes(status);
+  const canEditV = isAdmin || ((status === 'CA_SUBMITTED' || status === '17A_PERMISSION_PENDING') && isSupervisor);
+  const showVI = isAdmin || ['17A_PERMISSION_COMPLETED', 'PRELIMINARY_ENQUIRY_SUBMITTED'].includes(status);
+  const canEditVI = isAdmin || ((status === '17A_PERMISSION_COMPLETED') && isCreator);
 
   const { register, control, watch, setValue, getValues, formState: { isSubmitting } } = useForm({
     defaultValues: isEdit ? {
@@ -119,6 +158,61 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments 
   const [actionRemarks, setActionRemarks] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
+  // Parse initial petition number if formatted (e.g. KL/HO/BGK/COM/01/2026)
+  const parseInitialPetitionNo = (pNo) => {
+    const defaultYear = new Date().getFullYear().toString();
+    if (!pNo) return { caseNo: '', year: defaultYear };
+    const parts = pNo.split('/');
+    if (parts.length >= 6 && parts[0]?.toUpperCase() === 'KL' && parts[1]?.toUpperCase() === 'HO') {
+      return {
+        caseNo: parts[4] || '',
+        year: parts[5] || defaultYear
+      };
+    }
+    const m = pNo.match(/\/(\d{1,2})\/(\d{4})$/);
+    if (m) {
+      return {
+        caseNo: m[1].padStart(2, '0'),
+        year: m[2]
+      };
+    }
+    return { caseNo: '', year: defaultYear };
+  };
+
+  const initialParsed = useMemo(() => parseInitialPetitionNo(initialData?.petitionNo), [initialData?.petitionNo]);
+  const [caseNumber, setCaseNumber] = useState(initialParsed.caseNo);
+  const [selectedYear, setSelectedYear] = useState(initialParsed.year);
+
+  const watchedDistrict = watch('district');
+  const watchedType = watch('type');
+
+  // Derive district short code
+  const currentDistrictObj = districts.find(d => d.name?.toLowerCase() === (watchedDistrict || '').toLowerCase());
+  const districtCode = currentDistrictObj?.shortName ? currentDistrictObj.shortName.toUpperCase() : (watchedDistrict ? watchedDistrict.slice(0, 3).toUpperCase() : '');
+
+  // Derive type code (Complaint -> COM, Suo-motu -> SUO)
+  const typeCode = useMemo(() => {
+    if (!watchedType) return '';
+    const s = watchedType.toLowerCase();
+    if (s.includes('suo')) return 'SUO';
+    if (s.includes('com')) return 'COM';
+    return watchedType.slice(0, 3).toUpperCase();
+  }, [watchedType]);
+
+  const formattedCaseNo = caseNumber ? (caseNumber.length === 1 ? `0${caseNumber}` : caseNumber) : '';
+
+  // Synchronize petitionNo into form value
+  useEffect(() => {
+    if (canEditIandII) {
+      if (districtCode && typeCode && formattedCaseNo && selectedYear) {
+        const fullNo = `KL/HO/${districtCode}/${typeCode}/${formattedCaseNo}/${selectedYear}`;
+        setValue('petitionNo', fullNo, { shouldValidate: true });
+      }
+    }
+  }, [districtCode, typeCode, formattedCaseNo, selectedYear, canEditIandII, setValue]);
+
+  const previewPetitionNo = `KL/HO/${districtCode || '___'}/${typeCode || '___'}/${formattedCaseNo || '__'}/${selectedYear || new Date().getFullYear()}`;
+
   const handleAddRespondent = () => {
     if (newResp.name) {
       appendRespondent({ ...newResp, caDesignation: '', caDepartment: '', caSubDepartment: '', caPlace: '', permissionStatus: '', permissionSentDate: '', permissionReceivedFromCA: '', caSentToUnit: '' }, { shouldFocus: false });
@@ -140,7 +234,10 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments 
   const departmentOptions = departments.map(d => ({ value: d.name, label: d.name }));
   const getSubDeptOptions = (deptName) => getFilteredSubDepts(deptName).map(d => ({ value: d.name, label: d.name }));
   const districtOptions = withLegacyOption(
-    districts.map(d => ({ value: d.name, label: d.name })),
+    districts.map(d => ({
+      value: d.name,
+      label: d.shortName ? `${d.name} (${d.shortName})` : d.name
+    })),
     isEdit ? initialData.district : (localStorage.getItem('isHeadOffice') !== '1' ? localStorage.getItem('districtName') : null)
   );
 
@@ -153,7 +250,13 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments 
     
     // Validation before specific actions
     if (actionType === 'CREATE_SUBMIT' || actionType === 'RESUBMIT' || actionType === 'ADMIN_CREATE_FULL' || actionType === 'ADMIN_UPDATE') {
-      if (!data.district || !data.petitionNo || !data.petitionerName) return setErrorMsg('Petition Details are required.');
+      if (!data.district) return setErrorMsg('District is required.');
+      if (!data.type) return setErrorMsg('Petition Type (Complaint or Suo-motu) is required.');
+      if (!caseNumber || caseNumber.trim() === '') return setErrorMsg('2-digit Case Number is required (e.g. 01).');
+      if (!data.petitionNo || data.petitionNo.includes('___') || data.petitionNo.includes('/__/')) {
+        return setErrorMsg('Complete Petition Number is required (e.g. KL/HO/BGK/COM/01/2026).');
+      }
+      if (!data.petitionerName) return setErrorMsg('Name of the Petitioner is required.');
       if (data.respondents.length === 0) return setErrorMsg('At least one respondent is required.');
     }
     if (actionType === 'RETURN_17A' && !actionRemarks) return setErrorMsg('Remarks are required to return.');
@@ -232,21 +335,6 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments 
     }
   };
 
-  // Section Visibilities and Editability
-  // If admin: all sections I through VI are visible and editable at all times
-  const canEditIandII = isAdmin || status === 'DRAFT' || (status === '17A_RETURNED' && isCreator);
-  const showIII = isAdmin || (status !== 'DRAFT' && status !== '17A_RETURNED');
-  const canEditIII = isAdmin || ((status === 'SUBMITTED_TO_SUPERVISOR') && isSupervisor);
-
-  const showIV = isAdmin || ['17A_ACCEPTED', 'CA_SUBMITTED', '17A_PERMISSION_PENDING', '17A_PERMISSION_COMPLETED', 'PRELIMINARY_ENQUIRY_SUBMITTED'].includes(status);
-  const canEditIV = isAdmin || ((status === '17A_ACCEPTED') && isSupervisor);
-
-  const showV = isAdmin || ['CA_SUBMITTED', '17A_PERMISSION_PENDING', '17A_PERMISSION_COMPLETED', 'PRELIMINARY_ENQUIRY_SUBMITTED'].includes(status);
-  const canEditV = isAdmin || ((status === 'CA_SUBMITTED' || status === '17A_PERMISSION_PENDING') && isSupervisor);
-
-  const showVI = isAdmin || ['17A_PERMISSION_COMPLETED', 'PRELIMINARY_ENQUIRY_SUBMITTED'].includes(status);
-  const canEditVI = isAdmin || ((status === '17A_PERMISSION_COMPLETED') && isCreator);
-
   return (
     <div>
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
@@ -284,12 +372,28 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments 
       <div className="flex flex-col gap-5 max-w-[1400px]">
         {/* I. Petition Details */}
         <div className="bg-[#FFFDF7] border border-rule rounded-m p-6 shadow-soft">
-          <h4 className="text-[15px] text-ink-text mb-[18px] font-serif font-semibold flex items-baseline gap-2">
-            <span className="font-mono text-[13px] text-brass font-semibold">I.</span> Petition Details
-          </h4>
+          <div className="flex items-center justify-between mb-[18px]">
+            <h4 className="text-[15px] text-ink-text font-serif font-semibold flex items-baseline gap-2">
+              <span className="font-mono text-[13px] text-brass font-semibold">I.</span> Petition Details
+            </h4>
+            <span className="text-[11.5px] font-mono text-ink-text-faint hidden sm:inline">
+              Format: KL/HO/[DIST]/[TYPE]/[NO]/[YEAR]
+            </span>
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            {/* 1. District */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-[12.5px] font-semibold text-ink-text-soft">District</label>
+              <div className="flex items-center justify-between">
+                <label className="text-[12.5px] font-semibold text-ink-text-soft">
+                  District <span className="text-brick">*</span>
+                </label>
+                {districtCode && (
+                  <span className="font-mono text-[11px] font-bold text-[#000E89] bg-[#E8EEF9] border border-[#CBD8EF] px-1.5 py-0.2 rounded">
+                    {districtCode}
+                  </span>
+                )}
+              </div>
               <Controller
                 name="district"
                 control={control}
@@ -305,32 +409,163 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments 
                 )}
               />
             </div>
+
+            {/* 2. Type */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-[12.5px] font-semibold text-ink-text-soft">Petition No.</label>
-              <input type="text" className="app-input" {...register('petitionNo')} disabled={!canEditIandII} />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[12.5px] font-semibold text-ink-text-soft">Type</label>
+              <div className="flex items-center justify-between">
+                <label className="text-[12.5px] font-semibold text-ink-text-soft">
+                  Type <span className="text-brick">*</span>
+                </label>
+                {typeCode && (
+                  <span className="font-mono text-[11px] font-bold text-[#000E89] bg-[#E8EEF9] border border-[#CBD8EF] px-1.5 py-0.2 rounded">
+                    {typeCode}
+                  </span>
+                )}
+              </div>
               <select className="app-input" {...register('type')} disabled={!canEditIandII}>
                 <option value="">Select Type</option>
-                <option value="Complaint">Complaint</option>
-                <option value="Suo-motu">Suo-motu (Suo-motto)</option>
+                <option value="Complaint">Complaint (COM)</option>
+                <option value="Suo-motu">Suo-motu (SUO)</option>
               </select>
             </div>
+
+            {/* 3. Case Number (Strict 2-digit entry) */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-[12.5px] font-semibold text-ink-text-soft">Name of the Petitioner</label>
+              <div className="flex items-center justify-between">
+                <label className="text-[12.5px] font-semibold text-ink-text-soft">
+                  Case No. <span className="text-brick">*</span>
+                </label>
+                <span className="text-[11px] text-ink-text-faint font-mono">2 digits (01-99)</span>
+              </div>
+              <input
+                type="text"
+                inputMode="numeric"
+                maxLength={2}
+                placeholder="01"
+                className="app-input font-mono font-bold text-center tracking-widest text-[14px]"
+                value={caseNumber}
+                onChange={e => {
+                  const clean = e.target.value.replace(/\D/g, '').slice(0, 2);
+                  setCaseNumber(clean);
+                }}
+                onBlur={() => {
+                  if (caseNumber && caseNumber.length === 1) {
+                    setCaseNumber(`0${caseNumber}`);
+                  }
+                }}
+                disabled={!canEditIandII}
+              />
+            </div>
+
+            {/* 4. Year */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[12.5px] font-semibold text-ink-text-soft">
+                Year <span className="text-brick">*</span>
+              </label>
+              <select
+                className="app-input font-mono font-bold text-[14px]"
+                value={selectedYear}
+                onChange={e => setSelectedYear(e.target.value)}
+                disabled={!canEditIandII}
+              >
+                {[2026, 2025, 2024, 2023, 2027, 2028, 2029, 2030].map(y => (
+                  <option key={y} value={y.toString()}>{y}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* 5. Auto-Generated Petition Number Live Banner */}
+            <div className="sm:col-span-2 lg:col-span-4 bg-[#FAF6ED] border border-rule/80 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-[#E8EEF9] border border-[#CBD8EF] text-[#000E89] flex items-center justify-center font-bold font-mono text-[14px] shadow-2xs flex-shrink-0">
+                  №
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-ink-text-soft">
+                      Generated Petition Number
+                    </span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.2 rounded bg-[#E8EEF9] text-[#000E89] border border-[#CBD8EF]">
+                      Standard System Format
+                    </span>
+                  </div>
+                  <div className="font-mono text-[18px] font-bold text-[#000E89] tracking-wider mt-0.5">
+                    {previewPetitionNo}
+                  </div>
+                </div>
+              </div>
+
+              {/* Visual Breakdown Chips */}
+              <div className="flex items-center gap-1.5 flex-wrap self-start sm:self-auto font-mono text-[11px]">
+                <span className="px-2 py-1 rounded bg-white border border-rule/80 text-ink-text font-bold" title="Hardcoded Fixed Prefix">
+                  KL/HO
+                </span>
+                <span className="text-ink-text-faint">/</span>
+                <span
+                  className={`px-2 py-1 rounded border font-bold ${
+                    districtCode
+                      ? 'bg-[#E8EEF9] text-[#000E89] border-[#CBD8EF]'
+                      : 'bg-white text-ink-text-faint border-dashed border-rule'
+                  }`}
+                  title="District Short Code"
+                >
+                  {districtCode || 'DIST'}
+                </span>
+                <span className="text-ink-text-faint">/</span>
+                <span
+                  className={`px-2 py-1 rounded border font-bold ${
+                    typeCode
+                      ? 'bg-[#E8EEF9] text-[#000E89] border-[#CBD8EF]'
+                      : 'bg-white text-ink-text-faint border-dashed border-rule'
+                  }`}
+                  title="Type (COM / SUO)"
+                >
+                  {typeCode || 'TYPE'}
+                </span>
+                <span className="text-ink-text-faint">/</span>
+                <span
+                  className={`px-2 py-1 rounded border font-bold ${
+                    formattedCaseNo
+                      ? 'bg-[#E8EEF9] text-[#000E89] border-[#CBD8EF]'
+                      : 'bg-white text-ink-text-faint border-dashed border-rule'
+                  }`}
+                  title="2-digit Case Number"
+                >
+                  {formattedCaseNo || 'NO'}
+                </span>
+                <span className="text-ink-text-faint">/</span>
+                <span
+                  className="px-2 py-1 rounded bg-[#E8EEF9] text-[#000E89] border border-[#CBD8EF] font-bold"
+                  title="Year"
+                >
+                  {selectedYear}
+                </span>
+              </div>
+            </div>
+
+            {/* Petitioner Information */}
+            <div className="flex flex-col gap-1.5 sm:col-span-2">
+              <label className="text-[12.5px] font-semibold text-ink-text-soft">
+                Name of the Petitioner <span className="text-brick">*</span>
+              </label>
               <input type="text" className="app-input" {...register('petitionerName')} disabled={!canEditIandII} />
             </div>
             <div className="flex flex-col gap-1.5 sm:col-span-2">
-              <label className="text-[12.5px] font-semibold text-ink-text-soft">Address of the Petitioner</label>
+              <label className="text-[12.5px] font-semibold text-ink-text-soft">
+                Address of the Petitioner
+              </label>
               <input type="text" className="app-input" {...register('petitionerAddress')} disabled={!canEditIandII} />
             </div>
             <div className="flex flex-col gap-1.5 sm:col-span-1">
-              <label className="text-[12.5px] font-semibold text-ink-text-soft">SIR Officer Name</label>
+              <label className="text-[12.5px] font-semibold text-ink-text-soft">
+                SIR Officer Name
+              </label>
               <input type="text" className="app-input" placeholder="Officer name" {...register('sirOfficerName')} disabled={!canEditIandII} />
             </div>
             <div className="flex flex-col gap-1.5 sm:col-span-1">
-              <label className="text-[12.5px] font-semibold text-ink-text-soft">Officer Rank</label>
+              <label className="text-[12.5px] font-semibold text-ink-text-soft">
+                Officer Rank
+              </label>
               <input type="text" className="app-input" placeholder="e.g. SP, DySP, Inspector" {...register('officerRank')} disabled={!canEditIandII} />
             </div>
           </div>
@@ -496,9 +731,17 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments 
                   <label className="text-[12.5px] font-semibold text-ink-text-soft">Proposal Status</label>
                   <select className="app-input" {...register('proposalStatus')}>
                     <option value="">Select status</option>
-                    <option value="Accept">Accept</option>
-                    <option value="Pending">Pending</option>
-                    <option value="Returned with remarks">Returned with remarks</option>
+                    {proposalStatuses.length > 0 ? (
+                      proposalStatuses.map(s => (
+                        <option key={s.id || s.name} value={s.name}>{s.name}</option>
+                      ))
+                    ) : (
+                      <>
+                        <option value="Accept">Accept</option>
+                        <option value="Pending">Pending</option>
+                        <option value="Returned with remarks">Returned with remarks</option>
+                      </>
+                    )}
                   </select>
                 </div>
                 <div className="flex flex-col gap-1.5">
@@ -666,25 +909,34 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments 
                 <input type="text" className="app-input" {...register('peNo')} disabled={!canEditVI} />
               </div>
               <div className="flex flex-col gap-1.5">
-                <label className="text-[12.5px] font-semibold text-ink-text-soft">PE Status</label>
-                <select className="app-input" {...register('peStatus')} disabled={!canEditVI}>
-                  <option value="">Select status</option>
-                  <option value="Register FIR">Register FIR</option>
-                  <option value="Recommended to DE">Recommended to DE</option>
-                  <option value="Close">Close</option>
-                </select>
-              </div>
-              <div className="flex flex-col gap-1.5">
                 <label className="text-[12.5px] font-semibold text-ink-text-soft">Date of PE Registration</label>
                 <input type="date" className="app-input" {...register('peRegDate')} disabled={!canEditVI} />
               </div>
               <div className="flex flex-col gap-1.5">
+                <label className="text-[12.5px] font-semibold text-ink-text-soft">PE Enquery Officer</label>
+                <input type="text" className="app-input" {...register('sirEo')} disabled={!canEditVI} />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[12.5px] font-semibold text-ink-text-soft">PE Status</label>
+                <select className="app-input" {...register('peStatus')} disabled={!canEditVI}>
+                  <option value="">Select status</option>
+                  {peStatuses.length > 0 ? (
+                    peStatuses.map(s => (
+                      <option key={s.id || s.name} value={s.name}>{s.name}</option>
+                    ))
+                  ) : (
+                    <>
+                      <option value="PE Pending">PE Pending</option>
+                      <option value="Register FIR">Register FIR</option>
+                      <option value="Recommended to DE">Recommended to DE</option>
+                      <option value="Close">Close</option>
+                    </>
+                  )}
+                </select>
+              </div>
+              <div className="flex flex-col gap-1.5">
                 <label className="text-[12.5px] font-semibold text-ink-text-soft">Date of PE report sent to HQ</label>
                 <input type="date" className="app-input" {...register('peReportSentDate')} disabled={!canEditVI} />
-              </div>
-              <div className="flex flex-col gap-1.5 sm:col-span-2 lg:col-span-1">
-                <label className="text-[12.5px] font-semibold text-ink-text-soft">PE EO</label>
-                <input type="text" className="app-input" {...register('sirEo')} disabled={!canEditVI} />
               </div>
             </div>
             {canEditVI && !isAdmin && (

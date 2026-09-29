@@ -27,15 +27,12 @@ const buildMenu = (isAdmin) => [
   },
   ...(isAdmin ? [{ type: 'link', key: 'users', label: 'Users', icon: Users, path: '/users' }] : []),
   ...(isAdmin ? [{
-    type: 'group', key: 'masters', label: 'Masters', icon: Settings, prefix: '/masters',
-    children: [
-      { label: 'Districts', path: '/masters/districts' },
-      { label: 'Taluks', path: '/masters/taluks' },
-      { label: 'Police Stations', path: '/masters/police-stations' },
-      { label: 'Departments', path: '/masters/departments' },
-      { label: 'PE Status', path: '/masters/pe-status' },
-      { label: 'Proposal Status', path: '/masters/proposal-status' }
-    ]
+    type: 'link',
+    key: 'masters',
+    label: 'Masters',
+    icon: Settings,
+    path: '/masters/districts',
+    matchPrefix: '/masters'
   }] : []),
   { type: 'link', key: 'reports', label: 'Reports', icon: BarChart3, path: '/reports' }
 ];
@@ -81,6 +78,7 @@ export default function Sidebar({ collapsed, onExpandSidebar, onLinkClick }) {
               icon={item.icon}
               label={item.label}
               path={item.path}
+              matchPrefix={item.matchPrefix}
               end={item.end}
               collapsed={collapsed}
               onLinkClick={onLinkClick}

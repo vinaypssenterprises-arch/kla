@@ -351,7 +351,7 @@ export function exportPetitionToPdf(petition) {
       formatDate(petition.peReportSentDate)
     ],
     [
-      { content: 'PE EO (Enquiry Officer):', styles: { fontStyle: 'bold', textColor: NAVY } },
+      { content: 'PE Enquery Officer:', styles: { fontStyle: 'bold', textColor: NAVY } },
       { content: petition.sirEo || '—', colSpan: 3 }
     ]
   ];

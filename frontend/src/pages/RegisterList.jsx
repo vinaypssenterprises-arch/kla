@@ -216,6 +216,9 @@ export default function RegisterList() {
     if (s.includes('de')) {
       return <span className="stamp stamp-info">RECOMMENDED TO DE</span>;
     }
+    if (s.includes('pending')) {
+      return <span className="stamp stamp-warning">PE PENDING</span>;
+    }
     return <span className="stamp stamp-info">{status.toUpperCase()}</span>;
   };
 
@@ -298,6 +301,7 @@ export default function RegisterList() {
           onChange={e => setStatusFilter(e.target.value)}
         >
           <option value="">All PE Status</option>
+          <option value="PE Pending">PE Pending</option>
           <option value="Register FIR">Register FIR</option>
           <option value="Recommended to DE">Recommended to DE</option>
           <option value="Close">Close</option>
@@ -976,10 +980,6 @@ export default function RegisterList() {
                       </div>
                     </div>
                     <div>
-                      <span className="text-[11.5px] font-bold text-ink-text-soft block mb-1">PE Status</span>
-                      <div className="font-semibold text-ink-text">{viewingEntry.peStatus || '—'}</div>
-                    </div>
-                    <div>
                       <span className="text-[11.5px] font-bold text-ink-text-soft block mb-1">Date of PE Registration</span>
                       <div className="font-semibold text-ink-text flex items-center gap-1.5">
                         <Calendar className="w-3.5 h-3.5 text-brass" />
@@ -987,15 +987,19 @@ export default function RegisterList() {
                       </div>
                     </div>
                     <div>
+                      <span className="text-[11.5px] font-bold text-ink-text-soft block mb-1">PE Enquery Officer</span>
+                      <div className="font-semibold text-ink-text">{viewingEntry.sirEo || '—'}</div>
+                    </div>
+                    <div>
+                      <span className="text-[11.5px] font-bold text-ink-text-soft block mb-1">PE Status</span>
+                      <div className="font-semibold text-ink-text">{viewingEntry.peStatus || '—'}</div>
+                    </div>
+                    <div>
                       <span className="text-[11.5px] font-bold text-ink-text-soft block mb-1">Date of PE report sent to HQ</span>
                       <div className="font-semibold text-ink-text flex items-center gap-1.5">
                         <Calendar className="w-3.5 h-3.5 text-brass" />
                         {formatDate(viewingEntry.peReportSentDate)}
                       </div>
-                    </div>
-                    <div className="sm:col-span-2 lg:col-span-2">
-                      <span className="text-[11.5px] font-bold text-ink-text-soft block mb-1">PE EO (Enquiry Officer)</span>
-                      <div className="font-semibold text-ink-text">{viewingEntry.sirEo || '—'}</div>
                     </div>
                   </div>
                 </div>

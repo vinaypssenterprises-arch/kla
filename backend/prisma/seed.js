@@ -59,7 +59,7 @@ async function seedDistricts() {
 // Masters — no invented data. Department / Sub Department are seeded from
 // the standard Karnataka government department directory below.
 const MASTER_ITEMS = {
-  peStatus: ["Register FIR", "Recommended to DE", "Close"],
+  peStatus: ["PE Pending", "Register FIR", "Recommended to DE", "Close"],
   proposalStatus: ["Returned with remarks", "Accept"]
 };
 

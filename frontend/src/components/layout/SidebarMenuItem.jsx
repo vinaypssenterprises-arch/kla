@@ -1,7 +1,8 @@
 import React from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 
-export default function SidebarMenuItem({ icon: Icon, label, path, end, collapsed, onLinkClick, onClick, active }) {
+export default function SidebarMenuItem({ icon: Icon, label, path, end, matchPrefix, collapsed, onLinkClick, onClick, active }) {
+  const location = useLocation();
   const baseClass = 'flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-[13.5px] font-medium transition-colors duration-150 w-full';
   const inactiveClass = 'text-[#DCE4FA] hover:bg-white/15 hover:text-white';
   const activeClass = 'bg-white/20 text-white font-bold shadow-sm border-r-4 border-yellow-300';
@@ -14,13 +15,17 @@ export default function SidebarMenuItem({ icon: Icon, label, path, end, collapse
   );
 
   if (path) {
+    const isCustomActive = matchPrefix ? location.pathname.startsWith(matchPrefix) : undefined;
     return (
       <NavLink
         to={path}
         end={end}
         onClick={onLinkClick}
         title={collapsed ? label : undefined}
-        className={({ isActive }) => `${baseClass} ${isActive ? activeClass : inactiveClass}`}
+        className={({ isActive }) => {
+          const highlighted = isCustomActive !== undefined ? isCustomActive : isActive;
+          return `${baseClass} ${highlighted ? activeClass : inactiveClass}`;
+        }}
       >
         {content}
       </NavLink>
