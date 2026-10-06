@@ -87,10 +87,10 @@ export default function StatutoryAgingWatchlist({ watchlist = [] }) {
           <CheckCircle className="w-6 h-6" />
         </div>
         <h4 className="font-serif font-bold text-ink-text text-base mb-1">
-          No Statutory Delays Detected
+          No Delays Detected
         </h4>
         <p className="text-xs text-ink-text-soft max-w-md mx-auto">
-          All pending Section 17-A Competent Authority permission requests are within standard statutory turnaround times.
+          All pending Section 17-A Competent Authority permission requests are within standard turnaround times.
         </p>
       </div>
     );
@@ -109,12 +109,9 @@ export default function StatutoryAgingWatchlist({ watchlist = [] }) {
           <div className="flex items-center gap-2">
             <ShieldAlert className="w-5 h-5 text-brass" />
             <h3 className="text-base font-serif font-bold text-ink-text">
-              Statutory 17-A Competent Authority (CA) Sanction Status Tracker
+              17-A Competent Authority (CA) Status Tracker
             </h3>
           </div>
-          <p className="text-[12px] text-ink-text-soft mt-0.5">
-            Active status and statutory elapsed time organized by petition. Expand rows to view individual accused public servants.
-          </p>
         </div>
 
         {/* Status badges & Expand All Button */}
@@ -460,8 +457,7 @@ export default function StatutoryAgingWatchlist({ watchlist = [] }) {
         </table>
       </div>
       
-      <div className="mt-3 pt-2.5 border-t border-rule/30 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px] text-ink-text-faint">
-        <span>* Section 17-A (Prevention of Corruption Act) statutory response window: 3 months (90 days).</span>
+      <div className="mt-3 pt-2.5 border-t border-rule/30 flex items-center justify-end text-[11px] text-ink-text-faint">
         <span className="font-mono">Karnataka Lokayukta Legal Directorate</span>
       </div>
     </div>

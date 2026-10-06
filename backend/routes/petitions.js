@@ -141,6 +141,7 @@ router.post('/', async (req, res) => {
           peRegDate: data.peRegDate ? new Date(data.peRegDate) : null,
           peReportSentDate: data.peReportSentDate ? new Date(data.peReportSentDate) : null,
           sirEo: data.sirEo || null,
+          sirEoDesignation: data.sirEoDesignation || null,
         } : {}),
 
         respondents: {
@@ -365,6 +366,7 @@ router.post('/:id/action', async (req, res) => {
           peRegDate: payload.peRegDate ? new Date(payload.peRegDate) : null,
           peReportSentDate: payload.peReportSentDate ? new Date(payload.peReportSentDate) : null,
           sirEo: payload.sirEo,
+          sirEoDesignation: payload.sirEoDesignation || null,
           status: nextStatus,
           updatedById: req.user.userId
         }
@@ -502,6 +504,7 @@ router.put('/:id', async (req, res) => {
           peRegDate: data.peRegDate ? new Date(data.peRegDate) : null,
           peReportSentDate: data.peReportSentDate ? new Date(data.peReportSentDate) : null,
           sirEo: data.sirEo || null,
+          sirEoDesignation: data.sirEoDesignation || null,
           status: nextStatus,
           updatedById: req.user.userId
         }

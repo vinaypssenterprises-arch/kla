@@ -352,7 +352,7 @@ export function exportPetitionToPdf(petition) {
     ],
     [
       { content: 'PE Enquery Officer:', styles: { fontStyle: 'bold', textColor: NAVY } },
-      { content: petition.sirEo || '—', colSpan: 3 }
+      { content: petition.sirEo ? (petition.sirEoDesignation ? `${petition.sirEo} (${petition.sirEoDesignation})` : petition.sirEo) : '—', colSpan: 3 }
     ]
   ];
 

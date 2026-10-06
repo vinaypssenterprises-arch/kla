@@ -1047,6 +1047,10 @@ export default function RegisterList() {
                       <div className="font-semibold text-ink-text">{viewingEntry.sirEo || '—'}</div>
                     </div>
                     <div>
+                      <span className="text-[11.5px] font-bold text-ink-text-soft block mb-1">PE Enquery Officer Designation</span>
+                      <div className="font-semibold text-ink-text">{viewingEntry.sirEoDesignation || '—'}</div>
+                    </div>
+                    <div>
                       <span className="text-[11.5px] font-bold text-ink-text-soft block mb-1">PE Status</span>
                       <div className="font-semibold text-ink-text">{viewingEntry.peStatus || '—'}</div>
                     </div>

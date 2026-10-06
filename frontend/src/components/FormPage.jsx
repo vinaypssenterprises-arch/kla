@@ -1,5 +1,5 @@
 import { apiFetch } from '../lib/api';
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { ArrowLeft, Save, Plus, X, Clock, CheckCircle2, AlertCircle } from 'lucide-react';
@@ -18,6 +18,8 @@ export default function FormPage() {
   const [subDepartments, setSubDepartments] = useState([]);
   const [peStatuses, setPeStatuses] = useState([]);
   const [proposalStatuses, setProposalStatuses] = useState([]);
+  const [officers, setOfficers] = useState([]);
+  const [designations, setDesignations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const navigate = useNavigate();
@@ -66,12 +68,24 @@ export default function FormPage() {
       .then(data => setProposalStatuses(Array.isArray(data) ? data.filter(d => d.isActive) : []))
       .catch(err => console.error('Failed to load proposalStatuses', err));
 
+    const officersPromise = apiFetch(`/officers?all=true&forSelect=true`, {  })
+      .then(res => res.json())
+      .then(data => setOfficers(Array.isArray(data?.data) ? data.data.filter(o => o.isActive) : []))
+      .catch(err => console.error('Failed to load officers', err));
+
+    const designationsPromise = apiFetch(`/designations`, {  })
+      .then(res => res.json())
+      .then(data => setDesignations(Array.isArray(data) ? data.filter(d => d.isActive) : []))
+      .catch(err => console.error('Failed to load designations', err));
+
     Promise.all([
       districtsPromise,
       departmentsPromise,
       subDepartmentsPromise,
       peStatusesPromise,
       proposalStatusesPromise,
+      officersPromise,
+      designationsPromise,
       petitionPromise
     ]).finally(() => setLoading(false));
   }, [id, isEdit]);
@@ -93,11 +107,13 @@ export default function FormPage() {
       subDepartments={subDepartments}
       peStatuses={peStatuses}
       proposalStatuses={proposalStatuses}
+      officers={officers}
+      designations={designations}
     />
   );
 }
 
-function PetitionWorkflow({ initialData, districts, departments, subDepartments, peStatuses = [], proposalStatuses = [] }) {
+function PetitionWorkflow({ initialData, districts, departments, subDepartments, peStatuses = [], proposalStatuses = [], officers = [], designations = [] }) {
   const navigate = useNavigate();
   const { showSuccess, showError } = useToast();
   const isEdit = !!initialData;
@@ -145,9 +161,10 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments,
       peReportSentDate: toDateInput(initialData.peReportSentDate),
       peStatus: initialData.peStatus || '',
       sirEo: initialData.sirEo || '',
+      sirEoDesignation: initialData.sirEoDesignation || '',
     } : {
       district: isAdminNewPetition ? '' : (localStorage.getItem('isHeadOffice') !== '1' ? (localStorage.getItem('districtName') || '') : ''), 
-      petitionNo: '', type: '', petitionerName: '', petitionerAddress: '', sirOfficerName: '', officerRank: '', status: 'DRAFT', respondents: [], sirEo: '',
+      petitionNo: '', type: '', petitionerName: '', petitionerAddress: '', sirOfficerName: '', officerRank: '', status: 'DRAFT', respondents: [], sirEo: '', sirEoDesignation: '',
       proposalStatus: '', proposalSentDate: '',
       peNo: '', peRegDate: '', peReportSentDate: '', peStatus: '',
     }
@@ -158,37 +175,162 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments,
   const [actionRemarks, setActionRemarks] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
-  // Parse initial petition number if formatted (e.g. KL/HO/BGK/COM/01/2026)
+  // Parse initial petition number if formatted (e.g. KL/HO/BGK/COM/01/2026 or KL/ACB/HO/BGK/COM/01/2026)
   const parseInitialPetitionNo = (pNo) => {
     const defaultYear = new Date().getFullYear().toString();
-    if (!pNo) return { caseNo: '', year: defaultYear };
+    if (!pNo) return { caseNo: '', year: defaultYear, isAcb: false };
     const parts = pNo.split('/');
+    // Check ACB format: KL/ACB/HO/[DIST]/[TYPE]/[NO]/[YEAR]
+    if (parts.length >= 7 && parts[0]?.toUpperCase() === 'KL' && parts[1]?.toUpperCase() === 'ACB' && parts[2]?.toUpperCase() === 'HO') {
+      return {
+        caseNo: parts[5] || '',
+        year: parts[6] || defaultYear,
+        isAcb: true
+      };
+    }
+    // Check standard format: KL/HO/[DIST]/[TYPE]/[NO]/[YEAR]
     if (parts.length >= 6 && parts[0]?.toUpperCase() === 'KL' && parts[1]?.toUpperCase() === 'HO') {
       return {
         caseNo: parts[4] || '',
-        year: parts[5] || defaultYear
+        year: parts[5] || defaultYear,
+        isAcb: false
       };
     }
+    const isAcb = pNo.toUpperCase().includes('/ACB/') || pNo.toUpperCase().startsWith('KL/ACB/');
     const m = pNo.match(/\/(\d{1,2})\/(\d{4})$/);
     if (m) {
       return {
         caseNo: m[1].padStart(2, '0'),
-        year: m[2]
+        year: m[2],
+        isAcb
       };
     }
-    return { caseNo: '', year: defaultYear };
+    return { caseNo: '', year: defaultYear, isAcb };
   };
 
   const initialParsed = useMemo(() => parseInitialPetitionNo(initialData?.petitionNo), [initialData?.petitionNo]);
   const [caseNumber, setCaseNumber] = useState(initialParsed.caseNo);
   const [selectedYear, setSelectedYear] = useState(initialParsed.year);
+  const [isAcbCase, setIsAcbCase] = useState(initialParsed.isAcb);
+
+  useEffect(() => {
+    if (initialParsed.isAcb !== undefined) {
+      setIsAcbCase(initialParsed.isAcb);
+    }
+  }, [initialParsed.isAcb]);
 
   const watchedDistrict = watch('district');
   const watchedType = watch('type');
+  const watchedSirOfficerName = watch('sirOfficerName');
+  const watchedOfficerRank = watch('officerRank');
+  const watchedSirEo = watch('sirEo');
+  const watchedSirEoDesignation = watch('sirEoDesignation');
 
   // Derive district short code
   const currentDistrictObj = districts.find(d => d.name?.toLowerCase() === (watchedDistrict || '').toLowerCase());
   const districtCode = currentDistrictObj?.shortName ? currentDistrictObj.shortName.toUpperCase() : (watchedDistrict ? watchedDistrict.slice(0, 3).toUpperCase() : '');
+
+  // Reset officer and rank when district is changed by user
+  const prevDistrictRef = useRef(isEdit ? initialData?.district : (watchedDistrict || ''));
+  useEffect(() => {
+    if (prevDistrictRef.current && prevDistrictRef.current !== watchedDistrict) {
+      setValue('sirOfficerName', '', { shouldValidate: true });
+      setValue('officerRank', '', { shouldValidate: true });
+      setValue('sirEo', '', { shouldValidate: true });
+      setValue('sirEoDesignation', '', { shouldValidate: true });
+    }
+    prevDistrictRef.current = watchedDistrict;
+  }, [watchedDistrict, setValue]);
+
+  // Options for SIR Officer Name based on selected district
+  const officerOptions = useMemo(() => {
+    if (!currentDistrictObj) return [];
+    const matching = officers.filter(o => o.districtId === currentDistrictObj.id && o.isActive);
+    const opts = matching.map(o => ({
+      value: o.name === 'Vacant' ? `Vacant (${o.designation})` : o.name,
+      label: o.name === 'Vacant' ? `Vacant (${o.designation})` : `${o.name} (${o.designation})`,
+      designation: o.designation
+    }));
+
+    if (watchedSirOfficerName && !opts.some(o => o.value === watchedSirOfficerName)) {
+      opts.unshift({ value: watchedSirOfficerName, label: watchedSirOfficerName, designation: '' });
+    }
+    return opts;
+  }, [officers, currentDistrictObj, watchedSirOfficerName]);
+
+  // Options for Officer Rank based on selected district
+  const rankOptions = useMemo(() => {
+    if (!currentDistrictObj) return [];
+    const fromDesigs = designations
+      .filter(d => d.districtId === currentDistrictObj.id && d.isActive)
+      .map(d => d.name);
+    const fromOfficers = officers
+      .filter(o => o.districtId === currentDistrictObj.id && o.isActive && o.designation)
+      .map(o => o.designation);
+    const uniqueRanks = Array.from(new Set([...fromDesigs, ...fromOfficers])).filter(Boolean);
+    const opts = uniqueRanks.map(rank => ({
+      value: rank,
+      label: rank
+    }));
+
+    if (watchedOfficerRank && !opts.some(o => o.value === watchedOfficerRank)) {
+      opts.unshift({ value: watchedOfficerRank, label: watchedOfficerRank });
+    }
+    return opts;
+  }, [designations, officers, currentDistrictObj, watchedOfficerRank]);
+
+  const handleOfficerChange = (selectedName) => {
+    setValue('sirOfficerName', selectedName, { shouldValidate: true });
+    const matched = officerOptions.find(o => o.value === selectedName);
+    if (matched?.designation) {
+      setValue('officerRank', matched.designation, { shouldValidate: true });
+    }
+  };
+
+  // Options for PE Enquiry Officer Name based on selected district
+  const peOfficerOptions = useMemo(() => {
+    if (!currentDistrictObj) return [];
+    const matching = officers.filter(o => o.districtId === currentDistrictObj.id && o.isActive);
+    const opts = matching.map(o => ({
+      value: o.name === 'Vacant' ? `Vacant (${o.designation})` : o.name,
+      label: o.name === 'Vacant' ? `Vacant (${o.designation})` : `${o.name} (${o.designation})`,
+      designation: o.designation
+    }));
+
+    if (watchedSirEo && !opts.some(o => o.value === watchedSirEo)) {
+      opts.unshift({ value: watchedSirEo, label: watchedSirEo, designation: '' });
+    }
+    return opts;
+  }, [officers, currentDistrictObj, watchedSirEo]);
+
+  // Options for PE Enquiry Officer Designation based on selected district
+  const peRankOptions = useMemo(() => {
+    if (!currentDistrictObj) return [];
+    const fromDesigs = designations
+      .filter(d => d.districtId === currentDistrictObj.id && d.isActive)
+      .map(d => d.name);
+    const fromOfficers = officers
+      .filter(o => o.districtId === currentDistrictObj.id && o.isActive && o.designation)
+      .map(o => o.designation);
+    const uniqueRanks = Array.from(new Set([...fromDesigs, ...fromOfficers])).filter(Boolean);
+    const opts = uniqueRanks.map(rank => ({
+      value: rank,
+      label: rank
+    }));
+
+    if (watchedSirEoDesignation && !opts.some(o => o.value === watchedSirEoDesignation)) {
+      opts.unshift({ value: watchedSirEoDesignation, label: watchedSirEoDesignation });
+    }
+    return opts;
+  }, [designations, officers, currentDistrictObj, watchedSirEoDesignation]);
+
+  const handlePeOfficerChange = (selectedName) => {
+    setValue('sirEo', selectedName, { shouldValidate: true });
+    const matched = peOfficerOptions.find(o => o.value === selectedName);
+    if (matched?.designation) {
+      setValue('sirEoDesignation', matched.designation, { shouldValidate: true });
+    }
+  };
 
   // Derive type code (Complaint -> COM, Suo-motu -> SUO)
   const typeCode = useMemo(() => {
@@ -200,18 +342,19 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments,
   }, [watchedType]);
 
   const formattedCaseNo = caseNumber ? (caseNumber.length === 1 ? `0${caseNumber}` : caseNumber) : '';
+  const prefix = isAcbCase ? 'KL/ACB/HO' : 'KL/HO';
 
   // Synchronize petitionNo into form value
   useEffect(() => {
     if (canEditIandII) {
-      if (districtCode && typeCode && formattedCaseNo && selectedYear) {
-        const fullNo = `KL/HO/${districtCode}/${typeCode}/${formattedCaseNo}/${selectedYear}`;
+      if (districtCode && typeCode && formattedCaseNo && selectedYear && selectedYear.length === 4) {
+        const fullNo = `${prefix}/${districtCode}/${typeCode}/${formattedCaseNo}/${selectedYear}`;
         setValue('petitionNo', fullNo, { shouldValidate: true });
       }
     }
-  }, [districtCode, typeCode, formattedCaseNo, selectedYear, canEditIandII, setValue]);
+  }, [prefix, districtCode, typeCode, formattedCaseNo, selectedYear, canEditIandII, setValue]);
 
-  const previewPetitionNo = `KL/HO/${districtCode || '___'}/${typeCode || '___'}/${formattedCaseNo || '__'}/${selectedYear || new Date().getFullYear()}`;
+  const previewPetitionNo = `${prefix}/${districtCode || '___'}/${typeCode || '___'}/${formattedCaseNo || '__'}/${selectedYear || '____'}`;
 
   const handleAddRespondent = () => {
     if (newResp.name) {
@@ -253,8 +396,13 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments,
       if (!data.district) return setErrorMsg('District is required.');
       if (!data.type) return setErrorMsg('Petition Type (Complaint or Suo-motu) is required.');
       if (!caseNumber || caseNumber.trim() === '') return setErrorMsg('2-digit Case Number is required (e.g. 01).');
-      if (!data.petitionNo || data.petitionNo.includes('___') || data.petitionNo.includes('/__/')) {
-        return setErrorMsg('Complete Petition Number is required (e.g. KL/HO/BGK/COM/01/2026).');
+      if (!selectedYear || selectedYear.trim().length !== 4) return setErrorMsg('4-digit Year is required in YYYY format (e.g. 2026).');
+      if (districtCode && typeCode && formattedCaseNo && selectedYear && selectedYear.length === 4) {
+        data.petitionNo = `${prefix}/${districtCode}/${typeCode}/${formattedCaseNo}/${selectedYear}`;
+        setValue('petitionNo', data.petitionNo);
+      }
+      if (!data.petitionNo || data.petitionNo.includes('___') || data.petitionNo.includes('/__/') || data.petitionNo.includes('____')) {
+        return setErrorMsg(`Complete Petition Number is required (e.g. ${prefix}/BGK/COM/01/2026).`);
       }
       if (!data.petitionerName) return setErrorMsg('Name of the Petitioner is required.');
       if (data.respondents.length === 0) return setErrorMsg('At least one respondent is required.');
@@ -372,12 +520,37 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments,
       <div className="flex flex-col gap-5 max-w-[1400px]">
         {/* I. Petition Details */}
         <div className="bg-[#FFFDF7] border border-rule rounded-m p-6 shadow-soft">
-          <div className="flex items-center justify-between mb-[18px]">
-            <h4 className="text-[15px] text-ink-text font-serif font-semibold flex items-baseline gap-2">
-              <span className="font-mono text-[13px] text-brass font-semibold">I.</span> Petition Details
-            </h4>
+          <div className="flex items-center justify-between mb-[18px] flex-wrap gap-3">
+            <div className="flex items-center gap-3.5 flex-wrap">
+              <h4 className="text-[15px] text-ink-text font-serif font-semibold flex items-baseline gap-2">
+                <span className="font-mono text-[13px] text-brass font-semibold">I.</span> Petition Details
+              </h4>
+
+              {/* ACB Case Checkbox */}
+              <label className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-[12.5px] font-bold cursor-pointer transition-all select-none shadow-2xs ${
+                isAcbCase
+                  ? 'bg-amber-100 border-amber-400 text-amber-900 ring-2 ring-amber-400/30'
+                  : 'bg-white hover:bg-parchment border-rule text-ink-text-soft hover:text-ink-text'
+              }`}>
+                <input
+                  type="checkbox"
+                  id="acbCase"
+                  checked={isAcbCase}
+                  onChange={(e) => setIsAcbCase(e.target.checked)}
+                  disabled={!canEditIandII}
+                  className="w-4 h-4 text-[#000E89] accent-[#000E89] rounded cursor-pointer"
+                />
+                <span>ACB Case</span>
+                {isAcbCase && (
+                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-200 text-amber-950 font-bold ml-0.5">
+                    KL/ACB/HO
+                  </span>
+                )}
+              </label>
+            </div>
+
             <span className="text-[11.5px] font-mono text-ink-text-faint hidden sm:inline">
-              Format: KL/HO/[DIST]/[TYPE]/[NO]/[YEAR]
+              Format: {prefix}/[DIST]/[TYPE]/[NO]/[YEAR]
             </span>
           </div>
 
@@ -404,7 +577,7 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments,
                     options={districtOptions}
                     label="Select District"
                     placeholder="Select district"
-                    disabled={!canEditIandII || (!isAdminNewPetition && localStorage.getItem('isHeadOffice') !== '1')}
+                    disabled={!canEditIandII || (!isAdmin && localStorage.getItem('isHeadOffice') !== '1')}
                   />
                 )}
               />
@@ -457,37 +630,59 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments,
               />
             </div>
 
-            {/* 4. Year */}
+            {/* 4. Year (Strict 4-digit YYYY entry) */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-[12.5px] font-semibold text-ink-text-soft">
-                Year <span className="text-brick">*</span>
-              </label>
-              <select
-                className="app-input font-mono font-bold text-[14px]"
+              <div className="flex items-center justify-between">
+                <label className="text-[12.5px] font-semibold text-ink-text-soft">
+                  Year <span className="text-brick">*</span>
+                </label>
+                <span className="text-[11px] text-ink-text-faint font-mono">4 digits (YYYY)</span>
+              </div>
+              <input
+                type="text"
+                inputMode="numeric"
+                maxLength={4}
+                placeholder={new Date().getFullYear().toString()}
+                className="app-input font-mono font-bold text-center tracking-widest text-[14px]"
                 value={selectedYear}
-                onChange={e => setSelectedYear(e.target.value)}
+                onChange={e => {
+                  const clean = e.target.value.replace(/\D/g, '').slice(0, 4);
+                  setSelectedYear(clean);
+                }}
                 disabled={!canEditIandII}
-              >
-                {[2026, 2025, 2024, 2023, 2027, 2028, 2029, 2030].map(y => (
-                  <option key={y} value={y.toString()}>{y}</option>
-                ))}
-              </select>
+              />
             </div>
 
             {/* 5. Auto-Generated Petition Number Live Banner */}
-            <div className="sm:col-span-2 lg:col-span-4 bg-[#FAF6ED] border border-rule/80 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+            <div className={`sm:col-span-2 lg:col-span-4 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs border transition-colors ${
+              isAcbCase ? 'bg-[#FFF9EC] border-amber-300/90' : 'bg-[#FAF6ED] border-rule/80'
+            }`}>
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-[#E8EEF9] border border-[#CBD8EF] text-[#000E89] flex items-center justify-center font-bold font-mono text-[14px] shadow-2xs flex-shrink-0">
+                <div className={`w-10 h-10 rounded-lg border flex items-center justify-center font-bold font-mono text-[14px] shadow-2xs flex-shrink-0 ${
+                  isAcbCase ? 'bg-amber-100 border-amber-300 text-amber-900' : 'bg-[#E8EEF9] border-[#CBD8EF] text-[#000E89]'
+                }`}>
                   №
                 </div>
                 <div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-[11px] font-bold uppercase tracking-wider text-ink-text-soft">
                       Generated Petition Number
                     </span>
-                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.2 rounded bg-[#E8EEF9] text-[#000E89] border border-[#CBD8EF]">
-                      Standard System Format
+                    <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.2 rounded border ${
+                      isAcbCase ? 'bg-amber-100 text-amber-900 border-amber-300 font-bold' : 'bg-[#E8EEF9] text-[#000E89] border-[#CBD8EF]'
+                    }`}>
+                      {isAcbCase ? 'ACB Case System Format' : 'Standard System Format'}
                     </span>
+                    <label className="inline-flex items-center gap-1.5 ml-1.5 cursor-pointer text-[11px] font-bold text-ink-text-soft hover:text-ink-text select-none">
+                      <input
+                        type="checkbox"
+                        checked={isAcbCase}
+                        onChange={(e) => setIsAcbCase(e.target.checked)}
+                        disabled={!canEditIandII}
+                        className="w-3.5 h-3.5 accent-[#000E89] rounded cursor-pointer"
+                      />
+                      <span>ACB Case</span>
+                    </label>
                   </div>
                   <div className="font-mono text-[18px] font-bold text-[#000E89] tracking-wider mt-0.5">
                     {previewPetitionNo}
@@ -495,52 +690,7 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments,
                 </div>
               </div>
 
-              {/* Visual Breakdown Chips */}
-              <div className="flex items-center gap-1.5 flex-wrap self-start sm:self-auto font-mono text-[11px]">
-                <span className="px-2 py-1 rounded bg-white border border-rule/80 text-ink-text font-bold" title="Hardcoded Fixed Prefix">
-                  KL/HO
-                </span>
-                <span className="text-ink-text-faint">/</span>
-                <span
-                  className={`px-2 py-1 rounded border font-bold ${
-                    districtCode
-                      ? 'bg-[#E8EEF9] text-[#000E89] border-[#CBD8EF]'
-                      : 'bg-white text-ink-text-faint border-dashed border-rule'
-                  }`}
-                  title="District Short Code"
-                >
-                  {districtCode || 'DIST'}
-                </span>
-                <span className="text-ink-text-faint">/</span>
-                <span
-                  className={`px-2 py-1 rounded border font-bold ${
-                    typeCode
-                      ? 'bg-[#E8EEF9] text-[#000E89] border-[#CBD8EF]'
-                      : 'bg-white text-ink-text-faint border-dashed border-rule'
-                  }`}
-                  title="Type (COM / SUO)"
-                >
-                  {typeCode || 'TYPE'}
-                </span>
-                <span className="text-ink-text-faint">/</span>
-                <span
-                  className={`px-2 py-1 rounded border font-bold ${
-                    formattedCaseNo
-                      ? 'bg-[#E8EEF9] text-[#000E89] border-[#CBD8EF]'
-                      : 'bg-white text-ink-text-faint border-dashed border-rule'
-                  }`}
-                  title="2-digit Case Number"
-                >
-                  {formattedCaseNo || 'NO'}
-                </span>
-                <span className="text-ink-text-faint">/</span>
-                <span
-                  className="px-2 py-1 rounded bg-[#E8EEF9] text-[#000E89] border border-[#CBD8EF] font-bold"
-                  title="Year"
-                >
-                  {selectedYear}
-                </span>
-              </div>
+
             </div>
 
             {/* Petitioner Information */}
@@ -560,13 +710,39 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments,
               <label className="text-[12.5px] font-semibold text-ink-text-soft">
                 SIR Officer Name
               </label>
-              <input type="text" className="app-input" placeholder="Officer name" {...register('sirOfficerName')} disabled={!canEditIandII} />
+              <Controller
+                name="sirOfficerName"
+                control={control}
+                render={({ field }) => (
+                  <SearchableSelect
+                    value={field.value}
+                    onChange={handleOfficerChange}
+                    options={officerOptions}
+                    label="Select Officer"
+                    placeholder={!watchedDistrict ? "Select district first" : (officerOptions.length === 0 ? "No officers in district" : "Select officer name")}
+                    disabled={!canEditIandII || !watchedDistrict}
+                  />
+                )}
+              />
             </div>
             <div className="flex flex-col gap-1.5 sm:col-span-1">
               <label className="text-[12.5px] font-semibold text-ink-text-soft">
                 Officer Rank
               </label>
-              <input type="text" className="app-input" placeholder="e.g. SP, DySP, Inspector" {...register('officerRank')} disabled={!canEditIandII} />
+              <Controller
+                name="officerRank"
+                control={control}
+                render={({ field }) => (
+                  <SearchableSelect
+                    value={field.value}
+                    onChange={field.onChange}
+                    options={rankOptions}
+                    label="Select Officer Rank / Designation"
+                    placeholder={!watchedDistrict ? "Select district first" : (rankOptions.length === 0 ? "No designations found" : "Select officer rank")}
+                    disabled={!canEditIandII || !watchedDistrict}
+                  />
+                )}
+              />
             </div>
           </div>
         </div>
@@ -914,7 +1090,37 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments,
               </div>
               <div className="flex flex-col gap-1.5">
                 <label className="text-[12.5px] font-semibold text-ink-text-soft">PE Enquery Officer</label>
-                <input type="text" className="app-input" {...register('sirEo')} disabled={!canEditVI} />
+                <Controller
+                  name="sirEo"
+                  control={control}
+                  render={({ field }) => (
+                    <SearchableSelect
+                      value={field.value}
+                      onChange={handlePeOfficerChange}
+                      options={peOfficerOptions}
+                      label="Select PE Enquiry Officer"
+                      placeholder={!watchedDistrict ? "Select district first" : (peOfficerOptions.length === 0 ? "No officers in district" : "Select PE enquiry officer")}
+                      disabled={!canEditVI || !watchedDistrict}
+                    />
+                  )}
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[12.5px] font-semibold text-ink-text-soft">PE Enquery Officer Designation</label>
+                <Controller
+                  name="sirEoDesignation"
+                  control={control}
+                  render={({ field }) => (
+                    <SearchableSelect
+                      value={field.value}
+                      onChange={field.onChange}
+                      options={peRankOptions}
+                      label="Select PE Enquiry Officer Designation"
+                      placeholder={!watchedDistrict ? "Select district first" : (peRankOptions.length === 0 ? "No designations found" : "Select designation")}
+                      disabled={!canEditVI || !watchedDistrict}
+                    />
+                  )}
+                />
               </div>
               <div className="flex flex-col gap-1.5">
                 <label className="text-[12.5px] font-semibold text-ink-text-soft">PE Status</label>

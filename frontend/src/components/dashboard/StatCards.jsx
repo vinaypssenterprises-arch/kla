@@ -46,11 +46,11 @@ export default function StatCards({ overview = {}, onFilterPendingCa }) {
     },
     {
       id: 'permissions',
-      label: 'CA Sanctions Obtained',
+      label: 'CA Permissions Obtained',
       value: permissionsObtained,
       icon: ShieldCheck,
       accent: '#FBBF24',
-      badge: 'Statutory Approved',
+      badge: 'Approved',
       badgeColor: 'bg-amber-400/25 text-white border-amber-300/40',
       progressBar: { value: permissionRate, color: 'bg-amber-400' },
       to: '/register'
@@ -68,7 +68,7 @@ export default function StatCards({ overview = {}, onFilterPendingCa }) {
     },
     {
       id: 'pending-ca',
-      label: 'Statutory CA Pending Cases',
+      label: 'CA Pending Cases',
       value: totalPendingCa,
       icon: criticalPendingCount > 0 ? AlertTriangle : Clock,
       accent: criticalPendingCount > 0 ? '#FB923C' : '#FBBF24',
@@ -149,7 +149,7 @@ export default function StatCards({ overview = {}, onFilterPendingCa }) {
             key={card.id} 
             onClick={card.onClick} 
             className={`block h-full ${card.onClick ? 'cursor-pointer' : ''} focus:outline-none`}
-            title={card.onClick ? 'Click to jump to Statutory Watchlist' : undefined}
+            title={card.onClick ? 'Click to jump to Watchlist' : undefined}
           >
             {CardContent}
           </div>

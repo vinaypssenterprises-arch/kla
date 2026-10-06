@@ -5,10 +5,19 @@ const { authMiddleware } = require('./auth');
 
 router.use(authMiddleware);
 
-// Get all designations
+// Get all designations (optionally filter by districtId)
 router.get('/', async (req, res) => {
   try {
+    const { districtId } = req.query;
     const designations = await prisma.designation.findMany({
+      where: {
+        ...(districtId ? { districtId } : {})
+      },
+      include: {
+        district: {
+          select: { id: true, name: true, shortName: true }
+        }
+      },
       orderBy: { createdAt: 'desc' }
     });
     res.json(designations);
@@ -18,17 +27,46 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Create designation
+// Create designation — district selection is mandatory
 router.post('/', async (req, res) => {
   try {
-    const { name, isActive } = req.body;
-    if (!name) return res.status(400).json({ error: 'Designation name is required' });
+    const { name, districtId, isActive } = req.body;
+    const cleanName = (name || '').trim();
+    const cleanDistrictId = (districtId || '').trim();
 
-    const existing = await prisma.designation.findUnique({ where: { name } });
-    if (existing) return res.status(409).json({ error: 'Designation already exists' });
+    if (!cleanName) {
+      return res.status(400).json({ error: 'Designation name is required' });
+    }
+    if (!cleanDistrictId) {
+      return res.status(400).json({ error: 'District is mandatory for creating a designation' });
+    }
+
+    const district = await prisma.district.findUnique({ where: { id: cleanDistrictId } });
+    if (!district) {
+      return res.status(400).json({ error: 'Selected district does not exist' });
+    }
+
+    const existing = await prisma.designation.findFirst({
+      where: {
+        name: { equals: cleanName, mode: 'insensitive' },
+        districtId: cleanDistrictId
+      }
+    });
+    if (existing) {
+      return res.status(409).json({ error: `Designation "${cleanName}" already exists in ${district.name}` });
+    }
 
     const designation = await prisma.designation.create({
-      data: { name, isActive: isActive !== false }
+      data: {
+        name: cleanName,
+        districtId: cleanDistrictId,
+        isActive: isActive !== false
+      },
+      include: {
+        district: {
+          select: { id: true, name: true, shortName: true }
+        }
+      }
     });
     res.status(201).json(designation);
   } catch (error) {
@@ -37,22 +75,49 @@ router.post('/', async (req, res) => {
   }
 });
 
-// Update designation
+// Update designation — district selection is mandatory
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, isActive } = req.body;
+    const { name, districtId, isActive } = req.body;
+    const cleanName = (name || '').trim();
+    const cleanDistrictId = (districtId || '').trim();
 
-    if (!name) return res.status(400).json({ error: 'Designation name is required' });
+    if (!cleanName) {
+      return res.status(400).json({ error: 'Designation name is required' });
+    }
+    if (!cleanDistrictId) {
+      return res.status(400).json({ error: 'District is mandatory for designation' });
+    }
 
-    const existing = await prisma.designation.findUnique({ where: { name } });
-    if (existing && existing.id !== id) {
-      return res.status(409).json({ error: 'Designation name already exists' });
+    const district = await prisma.district.findUnique({ where: { id: cleanDistrictId } });
+    if (!district) {
+      return res.status(400).json({ error: 'Selected district does not exist' });
+    }
+
+    const existing = await prisma.designation.findFirst({
+      where: {
+        name: { equals: cleanName, mode: 'insensitive' },
+        districtId: cleanDistrictId,
+        NOT: { id }
+      }
+    });
+    if (existing) {
+      return res.status(409).json({ error: `Designation "${cleanName}" already exists in ${district.name}` });
     }
 
     const designation = await prisma.designation.update({
       where: { id },
-      data: { name, isActive }
+      data: {
+        name: cleanName,
+        districtId: cleanDistrictId,
+        isActive: isActive !== undefined ? (isActive === true || isActive === '1') : undefined
+      },
+      include: {
+        district: {
+          select: { id: true, name: true, shortName: true }
+        }
+      }
     });
     res.json(designation);
   } catch (error) {
@@ -65,7 +130,20 @@ router.put('/:id', async (req, res) => {
 // Delete designation
 router.delete('/:id', async (req, res) => {
   try {
-    await prisma.designation.delete({ where: { id: req.params.id } });
+    const { id } = req.params;
+    const usersCount = await prisma.user.count({
+      where: {
+        OR: [
+          { designationId: id },
+          { supervisorDesignationId: id }
+        ]
+      }
+    });
+    if (usersCount > 0) {
+      return res.status(400).json({ error: `Cannot delete designation because it is assigned to ${usersCount} user(s).` });
+    }
+
+    await prisma.designation.delete({ where: { id } });
     res.status(204).send();
   } catch (error) {
     if (error.code === 'P2025') return res.status(404).json({ error: 'Designation not found' });

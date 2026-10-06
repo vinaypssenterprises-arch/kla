@@ -41,24 +41,29 @@ model User {
 
 model Designation {
   id                String    @id @default(uuid())
-  name              String    @unique
+  name              String
+  districtId        String?
+  district          District? @relation(fields: [districtId], references: [id])
   isActive          Boolean   @default(true)
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
   users             User[]    @relation("UserDesignation")
   usersAsSupervisor User[]    @relation("UserSupervisorDesignation")
+
+  @@unique([districtId, name])
 }
 
 model District {
-  id        String    @id @default(uuid())
-  name      String    @unique
-  shortName String?   @unique
-  isActive  Boolean   @default(true)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  officers  Officer[]
-  users     User[]
+  id           String        @id @default(uuid())
+  name         String        @unique
+  shortName    String?       @unique
+  isActive     Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  officers     Officer[]
+  users        User[]
+  designations Designation[]
 }
 
 model MasterItem {
@@ -79,10 +84,10 @@ model Officer {
   districtId       String
   name             String
   designation      String
-  mobile           String
-  reportingDate    DateTime
-  presentAddress   String
-  permanentAddress String
+  mobile           String?
+  reportingDate    DateTime?
+  presentAddress   String?
+  permanentAddress String?
   remarks          String?
   isActive         Boolean                @default(true)
   createdById      String?
@@ -130,6 +135,7 @@ model Petition {
   peReportSentDate DateTime?
   peStatus         String?
   sirEo            String?
+  sirEoDesignation String?
   status           String       @default("DRAFT")
   createdById      String?
   updatedById      String?

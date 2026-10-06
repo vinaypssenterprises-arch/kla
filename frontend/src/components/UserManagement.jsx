@@ -269,12 +269,12 @@ export default function UserManagement() {
     editingUser?.district?.name
   );
   const designationOptions = withLegacyOption(
-    designations.map(d => ({ value: d.id, label: d.name })),
+    designations.map(d => ({ value: d.id, label: d.district?.name ? `${d.name} (${d.district.name})` : d.name })),
     editingUser && editingUser.designationId && !designations.find(d => d.id === editingUser.designationId) ? editingUser.designationId : null,
     editingUser?.designation?.name
   );
   const supervisorDesignationOptions = withLegacyOption(
-    designations.map(d => ({ value: d.id, label: d.name })),
+    designations.map(d => ({ value: d.id, label: d.district?.name ? `${d.name} (${d.district.name})` : d.name })),
     editingUser && editingUser.supervisorDesignationId && !designations.find(d => d.id === editingUser.supervisorDesignationId) ? editingUser.supervisorDesignationId : null,
     editingUser?.supervisorDesignation?.name
   );

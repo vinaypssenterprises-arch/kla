@@ -31,7 +31,7 @@ const sanitizePreviousPlaces = (previousPlaces) =>
     }));
 
 const validateOfficerPayload = (data, { partial = false } = {}) => {
-  const required = ['districtId', 'name', 'designation', 'mobile', 'reportingDate', 'presentAddress', 'permanentAddress'];
+  const required = ['districtId', 'name', 'designation'];
   if (!partial) {
     for (const field of required) {
       if (!data[field] || !String(data[field]).trim()) {
@@ -39,7 +39,7 @@ const validateOfficerPayload = (data, { partial = false } = {}) => {
       }
     }
   }
-  if (data.mobile && !MOBILE_REGEX.test(data.mobile)) {
+  if (data.mobile && data.mobile.trim() && !MOBILE_REGEX.test(data.mobile.trim())) {
     return 'Mobile number must be a valid 10-digit Indian mobile number';
   }
   return null;
@@ -59,7 +59,7 @@ router.get('/', async (req, res) => {
     const sortDir = req.query.sortDir === 'asc' ? 'asc' : 'desc';
 
     let allowedCreatorIds = null;
-    if (req.user.role !== 'admin') {
+    if (req.user.role !== 'admin' && req.query.forSelect !== 'true') {
       const supervisees = await prisma.user.findMany({
         where: { supervisorUserId: req.user.userId },
         select: { id: true }
@@ -152,16 +152,22 @@ router.post('/', canWrite, async (req, res) => {
     const validationError = validateOfficerPayload(data);
     if (validationError) return res.status(400).json({ error: validationError });
 
+    // Admin & Head Office can assign to any district; regular district users stay locked to their district
+    let targetDistrictId = data.districtId;
+    if (req.user.role !== 'admin' && !req.user.isHeadOffice && req.user.districtId) {
+      targetDistrictId = req.user.districtId;
+    }
+
     const officer = await prisma.officer.create({
       data: {
-        districtId: data.districtId,
+        districtId: targetDistrictId,
         name: data.name.trim(),
         designation: data.designation.trim(),
-        mobile: data.mobile.trim(),
-        reportingDate: new Date(data.reportingDate),
-        presentAddress: data.presentAddress.trim(),
-        permanentAddress: data.permanentAddress.trim(),
-        remarks: data.remarks ? data.remarks.trim() : null,
+        mobile: data.mobile && data.mobile.trim() ? data.mobile.trim() : null,
+        reportingDate: data.reportingDate ? new Date(data.reportingDate) : null,
+        presentAddress: data.presentAddress && data.presentAddress.trim() ? data.presentAddress.trim() : null,
+        permanentAddress: data.permanentAddress && data.permanentAddress.trim() ? data.permanentAddress.trim() : null,
+        remarks: data.remarks && data.remarks.trim() ? data.remarks.trim() : null,
         createdById: req.user.userId,
         updatedById: req.user.userId,
         previousPlaces: { create: sanitizePreviousPlaces(data.previousPlaces) }
@@ -192,20 +198,26 @@ router.put('/:id', canWrite, async (req, res) => {
       return res.status(403).json({ error: 'You can only edit records you created' });
     }
 
+    // Admin & Head Office can reassign to any district; regular district users stay locked to their district
+    let targetDistrictId = data.districtId;
+    if (req.user.role !== 'admin' && !req.user.isHeadOffice && req.user.districtId) {
+      targetDistrictId = req.user.districtId;
+    }
+
     const officer = await prisma.$transaction(async (tx) => {
       await tx.officerPreviousPlace.deleteMany({ where: { officerId: id } });
 
       return tx.officer.update({
         where: { id },
         data: {
-          districtId: data.districtId,
+          districtId: targetDistrictId,
           name: data.name.trim(),
           designation: data.designation.trim(),
-          mobile: data.mobile.trim(),
-          reportingDate: new Date(data.reportingDate),
-          presentAddress: data.presentAddress.trim(),
-          permanentAddress: data.permanentAddress.trim(),
-          remarks: data.remarks ? data.remarks.trim() : null,
+          mobile: data.mobile && data.mobile.trim() ? data.mobile.trim() : null,
+          reportingDate: data.reportingDate ? new Date(data.reportingDate) : null,
+          presentAddress: data.presentAddress && data.presentAddress.trim() ? data.presentAddress.trim() : null,
+          permanentAddress: data.permanentAddress && data.permanentAddress.trim() ? data.permanentAddress.trim() : null,
+          remarks: data.remarks && data.remarks.trim() ? data.remarks.trim() : null,
           updatedById: req.user.userId,
           previousPlaces: { create: sanitizePreviousPlaces(data.previousPlaces) }
         },

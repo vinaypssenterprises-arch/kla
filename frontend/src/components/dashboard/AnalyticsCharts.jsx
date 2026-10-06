@@ -101,9 +101,6 @@ export default function AnalyticsCharts({
                 Active Jurisdictions
               </span>
             </div>
-            <p className="text-[12px] text-ink-text-soft mb-3">
-              Comparison between registered corruption petitions and active Lokayukta investigative officers deployed.
-            </p>
 
             <div className="h-[250px] w-full">
               <ResponsiveContainer width="100%" height="100%">
@@ -144,8 +141,7 @@ export default function AnalyticsCharts({
             </div>
           </div>
 
-          <div className="pt-3 border-t border-rule/30 flex items-center justify-between text-[11px] text-ink-text-faint">
-            <span>Jurisdictions with active cases or deployed officers</span>
+          <div className="pt-3 border-t border-rule/30 flex items-center justify-end text-[11px] text-ink-text-faint">
             <span className="font-mono text-ink-text-soft">{districtBreakdown.length} active units</span>
           </div>
         </div>
@@ -164,9 +160,6 @@ export default function AnalyticsCharts({
                 Monthly Influx
               </span>
             </div>
-            <p className="text-[12px] text-ink-text-soft mb-4">
-              Petitions filed vs statutory CA sanctions granted over the past 6 months.
-            </p>
 
             <div className="h-[280px] w-full">
               <ResponsiveContainer width="100%" height="100%">
@@ -212,8 +205,7 @@ export default function AnalyticsCharts({
             </div>
           </div>
 
-          <div className="pt-3 border-t border-rule/30 flex items-center justify-between text-[11px] text-ink-text-faint">
-            <span>Tracked from official proposal dispatch logs</span>
+          <div className="pt-3 border-t border-rule/30 flex items-center justify-end text-[11px] text-ink-text-faint">
             <span className="text-emerald-700 font-semibold font-mono">Enforcement Active</span>
           </div>
         </div>
@@ -228,16 +220,13 @@ export default function AnalyticsCharts({
               <div className="flex items-center gap-2">
                 <PieIcon className="w-4 h-4 text-brass" />
                 <h4 className="text-[14.5px] font-serif font-bold text-ink-text">
-                  17-A CA Sanction Status
+                  17-A CA Status
                 </h4>
               </div>
               <span className="text-[10.5px] text-ink-text-soft bg-parchment-2 px-2 py-0.5 rounded border border-rule/40">
                 Respondents
               </span>
             </div>
-            <p className="text-[12px] text-ink-text-soft mb-2">
-              Statutory decision breakdown across all accused public servants.
-            </p>
 
             <div className="h-[200px] w-full relative">
               <ResponsiveContainer width="100%" height="100%">
@@ -301,9 +290,6 @@ export default function AnalyticsCharts({
                 Disposal
               </span>
             </div>
-            <p className="text-[12px] text-ink-text-soft mb-2">
-              Action taken upon conclusion of preliminary investigation.
-            </p>
 
             <div className="space-y-2.5 mt-4">
               {peChartData.map((item, idx) => {
@@ -335,8 +321,7 @@ export default function AnalyticsCharts({
             </div>
           </div>
 
-          <div className="pt-3 border-t border-rule/30 flex items-center justify-between text-[11px] text-ink-text-faint">
-            <span>Legal prosecution conversion:</span>
+          <div className="pt-3 border-t border-rule/30 flex items-center justify-end text-[11px] text-ink-text-faint">
             <span className="font-semibold text-rose-700">Highest Priority</span>
           </div>
         </div>
@@ -355,9 +340,6 @@ export default function AnalyticsCharts({
                 Ranking
               </span>
             </div>
-            <p className="text-[12px] text-ink-text-soft mb-3">
-              Government departments with the highest accused respondent volume.
-            </p>
 
             <div className="space-y-2">
               {topDepartments.slice(0, 5).map((dept, index) => {
@@ -391,8 +373,7 @@ export default function AnalyticsCharts({
             </div>
           </div>
 
-          <div className="pt-3 border-t border-rule/30 flex items-center justify-between text-[11px] text-ink-text-faint">
-            <span>Source: Respondent registry records</span>
+          <div className="pt-3 border-t border-rule/30 flex items-center justify-end text-[11px] text-ink-text-faint">
             <span className="text-ink-text-soft font-mono font-medium">Karnataka State</span>
           </div>
         </div>

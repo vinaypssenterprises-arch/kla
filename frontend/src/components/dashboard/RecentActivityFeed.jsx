@@ -23,9 +23,6 @@ export default function RecentActivityFeed({ recentPetitions = [] }) {
             <ArrowRight className="w-3.5 h-3.5" />
           </Link>
         </div>
-        <p className="text-[12px] text-ink-text-soft mb-3">
-          Latest official complaints and vigilance inquiries entered into the state register.
-        </p>
 
         <div className="divide-y divide-rule/20">
           {recentPetitions.map((p) => {
@@ -101,8 +98,7 @@ export default function RecentActivityFeed({ recentPetitions = [] }) {
         </div>
       </div>
 
-      <div className="pt-3 mt-2 border-t border-rule/30 flex items-center justify-between text-[11px] text-ink-text-faint">
-        <span>Verified by Lokayukta Registry Officer</span>
+      <div className="pt-3 mt-2 border-t border-rule/30 flex items-center justify-end text-[11px] text-ink-text-faint">
         <Link to="/register/new" className="font-semibold text-brass hover:text-maroon">
           + Enter New Petition
         </Link>

@@ -51,8 +51,9 @@ const CATEGORIES = [
     singular: 'Designation',
     apiCategory: 'designations',
     isCustom: true,
+    hasDistrict: true,
     icon: Award,
-    description: 'Official government cadres, ranks, and designations of public servants and respondent officers.'
+    description: 'Official government cadres, ranks, and designations of public servants and respondent officers mapped to districts.'
   },
   {
     key: 'pe-status',
@@ -80,13 +81,15 @@ export default function Masters() {
 
   const [items, setItems] = useState([]);
   const [departments, setDepartments] = useState([]);
+  const [districts, setDistricts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL'); // ALL, ACTIVE, INACTIVE
+  const [districtFilter, setDistrictFilter] = useState('');
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
-  const [form, setForm] = useState({ name: '', shortName: '', isActive: true, parentId: '' });
+  const [form, setForm] = useState({ name: '', shortName: '', isActive: true, parentId: '', districtId: '' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -102,6 +105,7 @@ export default function Masters() {
   useEffect(() => {
     setSearchQuery('');
     setStatusFilter('ALL');
+    setDistrictFilter('');
     fetchItems();
   }, [active.key]);
 
@@ -121,6 +125,14 @@ export default function Masters() {
           setDepartments(Array.isArray(deptData) ? deptData : []);
         }
       }
+
+      if (active.hasDistrict) {
+        const distRes = await apiFetch('/districts');
+        if (distRes.ok) {
+          const distData = await distRes.json();
+          setDistricts(Array.isArray(distData) ? distData.filter(d => d.isActive) : []);
+        }
+      }
     } catch (err) {
       console.error('Failed to fetch master items', err);
     } finally {
@@ -130,7 +142,7 @@ export default function Masters() {
 
   const openCreate = () => {
     setEditingItem(null);
-    setForm({ name: '', shortName: '', isActive: true, parentId: '' });
+    setForm({ name: '', shortName: '', isActive: true, parentId: '', districtId: districtFilter || '' });
     setError('');
     setModalOpen(true);
   };
@@ -141,7 +153,8 @@ export default function Masters() {
       name: item.name,
       shortName: item.shortName || '',
       isActive: item.isActive !== false,
-      parentId: item.parentId || ''
+      parentId: item.parentId || '',
+      districtId: item.districtId || item.district?.id || ''
     });
     setError('');
     setModalOpen(true);
@@ -176,13 +189,19 @@ export default function Masters() {
       return;
     }
 
+    if (active.hasDistrict && !form.districtId) {
+      setError(`District is mandatory. Please select a district.`);
+      return;
+    }
+
     setSaving(true);
     try {
       const payload = {
         name: cleanName,
         isActive: form.isActive !== false,
         ...(active.isDistrict ? { shortName: form.shortName ? form.shortName.trim().toUpperCase() : null } : {}),
-        ...(active.apiCategory === 'subDepartment' ? { parentId: form.parentId } : {})
+        ...(active.apiCategory === 'subDepartment' ? { parentId: form.parentId } : {}),
+        ...(active.hasDistrict ? { districtId: form.districtId } : {})
       };
 
       const url = editingItem ? `${baseUrl}/${editingItem.id}` : baseUrl;
@@ -228,12 +247,18 @@ export default function Masters() {
     }
   };
 
-  // Filtered items based on search and status
+  // Filtered items based on search, status, and district
   const filteredItems = useMemo(() => {
     return items.filter(item => {
       // Status filter
       if (statusFilter === 'ACTIVE' && !item.isActive) return false;
       if (statusFilter === 'INACTIVE' && item.isActive) return false;
+
+      // District filter for designations
+      if (active.hasDistrict && districtFilter) {
+        const itemDistId = item.districtId || item.district?.id;
+        if (itemDistId !== districtFilter) return false;
+      }
 
       // Search query
       if (!searchQuery.trim()) return true;
@@ -244,10 +269,13 @@ export default function Masters() {
       const parentMatch = active.apiCategory === 'subDepartment'
         ? departments.find(d => d.id === item.parentId)?.name?.toLowerCase().includes(q)
         : false;
+      const districtMatch = active.hasDistrict
+        ? (item.district?.name?.toLowerCase().includes(q) || item.district?.shortName?.toLowerCase().includes(q))
+        : false;
 
-      return nameMatch || shortMatch || parentMatch;
+      return nameMatch || shortMatch || parentMatch || districtMatch;
     });
-  }, [items, searchQuery, statusFilter, active.apiCategory, departments]);
+  }, [items, searchQuery, statusFilter, districtFilter, active.apiCategory, active.hasDistrict, departments]);
 
   const activeCount = useMemo(() => items.filter(i => i.isActive).length, [items]);
   const inactiveCount = useMemo(() => items.filter(i => !i.isActive).length, [items]);
@@ -394,31 +422,49 @@ export default function Masters() {
           </div>
 
           {/* Search & Status Filter Row */}
-          <div className="mt-5 pt-4 border-t border-parchment-2/80 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-            {/* Live Search */}
-            <div className="relative flex-1 max-w-md">
-              <Search className="w-4 h-4 text-ink-text-faint absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <input
-                type="text"
-                className="app-input pl-10 pr-9 py-2 text-[13.5px] rounded-lg bg-white"
-                placeholder={`Search ${active.label.toLowerCase()} by name${active.isDistrict ? ', short code' : active.apiCategory === 'subDepartment' ? ', department' : ''}...`}
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-text-faint hover:text-ink-text p-1"
-                  title="Clear search"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
+          <div className="mt-5 pt-4 border-t border-parchment-2/80 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-1 max-w-2xl">
+              {/* Live Search */}
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-ink-text-faint absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="text"
+                  className="app-input pl-10 pr-9 py-2 text-[13.5px] rounded-lg bg-white"
+                  placeholder={`Search ${active.label.toLowerCase()} by name${active.isDistrict ? ', short code' : active.hasDistrict ? ', district' : active.apiCategory === 'subDepartment' ? ', department' : ''}...`}
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-text-faint hover:text-ink-text p-1"
+                    title="Clear search"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* District Filter Dropdown for Designations */}
+              {active.hasDistrict && districts.length > 0 && (
+                <div className="w-full sm:w-[220px]">
+                  <SearchableSelect
+                    value={districtFilter}
+                    onChange={setDistrictFilter}
+                    options={[{ value: '', label: 'All Districts' }, ...districts.map(d => ({
+                      value: d.id,
+                      label: d.shortName ? `${d.name} (${d.shortName})` : d.name
+                    }))]}
+                    label="Filter by District"
+                    placeholder="All Districts"
+                  />
+                </div>
               )}
             </div>
 
             {/* Status Segmented Filter */}
-            <div className="flex items-center gap-1 bg-[#F2EDE2] p-1 rounded-lg border border-rule/80 self-start sm:self-auto">
+            <div className="flex items-center gap-1 bg-[#F2EDE2] p-1 rounded-lg border border-rule/80 self-start lg:self-auto">
               <button
                 type="button"
                 onClick={() => setStatusFilter('ALL')}
@@ -511,6 +557,11 @@ export default function Masters() {
                       Short Code
                     </th>
                   )}
+                  {active.hasDistrict && (
+                    <th className="py-3 px-4 text-left text-[11px] font-bold uppercase tracking-wider text-ink-text-soft">
+                      District
+                    </th>
+                  )}
                   {active.apiCategory === 'subDepartment' && (
                     <th className="py-3 px-4 text-left text-[11px] font-bold uppercase tracking-wider text-ink-text-soft">
                       Parent Department
@@ -559,6 +610,21 @@ export default function Masters() {
                             Not assigned
                           </span>
                         )}
+                      </td>
+                    )}
+
+                    {/* Linked District for Designations */}
+                    {active.hasDistrict && (
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-1.5 text-[13px] text-ink-text font-medium">
+                          <MapPin className="w-3.5 h-3.5 text-brass flex-shrink-0" />
+                          <span>{item.district?.name || '—'}</span>
+                          {item.district?.shortName && (
+                            <span className="font-mono text-[10.5px] font-bold text-[#000E89] bg-[#E8EEF9] border border-[#CBD8EF] px-1.5 py-0.2 rounded">
+                              {item.district.shortName}
+                            </span>
+                          )}
+                        </div>
                       </td>
                     )}
 
@@ -729,6 +795,28 @@ export default function Masters() {
                   label="Select Parent Department"
                   placeholder="Search and select department..."
                 />
+              </div>
+            )}
+
+            {/* District Selector for Designations (MANDATORY) */}
+            {active.hasDistrict && (
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[12.5px] font-semibold text-ink-text">
+                  District <span className="text-brick">*</span>
+                </label>
+                <SearchableSelect
+                  value={form.districtId}
+                  onChange={v => setForm({ ...form, districtId: v })}
+                  options={districts.map(d => ({
+                    value: d.id,
+                    label: d.shortName ? `${d.name} (${d.shortName})` : d.name
+                  }))}
+                  label="Select District"
+                  placeholder="Search and select district..."
+                />
+                <span className="text-[11px] text-ink-text-faint">
+                  Mandatory: Every designation must be assigned to a specific district.
+                </span>
               </div>
             )}
 

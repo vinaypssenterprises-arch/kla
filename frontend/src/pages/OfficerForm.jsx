@@ -1,5 +1,5 @@
 import { apiFetch } from '../lib/api';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -12,18 +12,20 @@ const formSchema = z.object({
   districtId: z.string().min(1, 'District is required'),
   name: z.string().min(1, 'Officer name is required'),
   designation: z.string().min(1, 'Designation is required'),
-  mobile: z.string().regex(/^[6-9]\d{9}$/, 'Enter a valid 10-digit Indian mobile number'),
-  reportingDate: z.string().min(1, 'Reporting date is required'),
+  mobile: z.string().optional().refine(val => !val || /^[6-9]\d{9}$/.test(val), {
+    message: 'Enter a valid 10-digit Indian mobile number'
+  }),
+  reportingDate: z.string().optional(),
   remarks: z.string().optional(),
-  presentAddress: z.string().min(1, 'Present residence address is required'),
-  permanentAddress: z.string().min(1, 'Permanent address is required'),
+  presentAddress: z.string().optional(),
+  permanentAddress: z.string().optional(),
   previousPlaces: z.array(
     z.object({
       place: z.string().optional(),
       fromYear: z.string().optional(),
       toYear: z.string().optional()
     })
-  )
+  ).optional()
 });
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
@@ -34,53 +36,65 @@ export default function OfficerForm() {
   const isEdit = !!id;
   const [initialData, setInitialData] = useState(null);
   const [districts, setDistricts] = useState([]);
+  const [designations, setDesignations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    const districtsPromise = apiFetch(`/districts`, {  })
+    const districtsPromise = apiFetch(`/districts`)
       .then(res => res.json())
-      .then(data => setDistricts(data.filter(d => d.isActive)))
+      .then(data => setDistricts(Array.isArray(data) ? data.filter(d => d.isActive) : []))
       .catch(err => console.error('Failed to load districts', err));
 
+    const designationsPromise = apiFetch(`/designations`)
+      .then(res => res.json())
+      .then(data => setDesignations(Array.isArray(data) ? data.filter(d => d.isActive) : []))
+      .catch(err => console.error('Failed to load designations', err));
+
     const officerPromise = isEdit
-      ? apiFetch(`/officers/${id}`, {  })
+      ? apiFetch(`/officers/${id}`)
           .then(res => res.json())
           .then(setInitialData)
           .catch(() => setNotFound(true))
       : Promise.resolve();
 
-    Promise.all([districtsPromise, officerPromise]).finally(() => setLoading(false));
+    Promise.all([districtsPromise, designationsPromise, officerPromise]).finally(() => setLoading(false));
   }, [id, isEdit]);
 
   if (loading) return <div className="min-h-screen flex items-center justify-center text-ink-text-soft">Loading...</div>;
   if (isEdit && notFound) return <div className="min-h-screen flex items-center justify-center text-ink-text-soft">Officer not found.</div>;
 
-  return <OfficerFormInner initialData={initialData} districts={districts} />;
+  return <OfficerFormInner initialData={initialData} districts={districts} allDesignations={designations} />;
 }
 
-function OfficerFormInner({ initialData, districts }) {
+function OfficerFormInner({ initialData, districts, allDesignations = [] }) {
   const navigate = useNavigate();
   const isEdit = !!initialData;
-  const { showError } = useToast();
+  const { showError, showSuccess } = useToast();
 
-  const { register, control, handleSubmit, formState: { errors, isSubmitting } } = useForm({
+  const role = localStorage.getItem('role');
+  const isAdmin = role === 'admin';
+  const isHeadOffice = localStorage.getItem('isHeadOffice') === '1';
+  const canSelectAnyDistrict = isAdmin || isHeadOffice;
+  const userDistrictId = localStorage.getItem('districtId') || '';
+  const userDistrictName = localStorage.getItem('districtName') || '';
+
+  const { register, control, handleSubmit, watch, setValue, formState: { errors, isSubmitting } } = useForm({
     resolver: zodResolver(formSchema),
     defaultValues: isEdit ? {
-      districtId: initialData.districtId || '',
-      name: initialData.name || '',
-      designation: initialData.designation || '',
-      mobile: initialData.mobile || '',
-      reportingDate: toDateInput(initialData.reportingDate) || todayStr(),
-      remarks: initialData.remarks || '',
-      presentAddress: initialData.presentAddress || '',
-      permanentAddress: initialData.permanentAddress || '',
-      previousPlaces: (initialData.previousPlaces || []).map(p => ({
+      districtId: initialData?.districtId || '',
+      name: initialData?.name || '',
+      designation: initialData?.designation || '',
+      mobile: initialData?.mobile || '',
+      reportingDate: toDateInput(initialData?.reportingDate) || todayStr(),
+      remarks: initialData?.remarks || '',
+      presentAddress: initialData?.presentAddress || '',
+      permanentAddress: initialData?.permanentAddress || '',
+      previousPlaces: (initialData?.previousPlaces || []).map(p => ({
         place: p.place || '', fromYear: p.fromYear || '', toYear: p.toYear || ''
       }))
     } : {
-      districtId: localStorage.getItem('isHeadOffice') !== '1' ? (localStorage.getItem('districtId') || '') : '', 
+      districtId: canSelectAnyDistrict ? '' : userDistrictId, 
       name: '', designation: '', mobile: '',
       reportingDate: todayStr(), remarks: '', presentAddress: '', permanentAddress: '',
       previousPlaces: [{ place: '', fromYear: '', toYear: '' }]
@@ -89,17 +103,48 @@ function OfficerFormInner({ initialData, districts }) {
 
   const { fields, append, remove } = useFieldArray({ control, name: 'previousPlaces' });
 
+  const watchedDistrictId = watch('districtId');
+
   const districtOptions = (() => {
-    const opts = districts.map(d => ({ value: d.id, label: d.name }));
+    const opts = districts.map(d => ({
+      value: d.id,
+      label: d.shortName ? `${d.name} (${d.shortName})` : d.name
+    }));
     const legacyId = isEdit
-      ? (initialData.district && !districts.some(d => d.id === initialData.districtId) ? initialData.districtId : null)
-      : (localStorage.getItem('isHeadOffice') !== '1' && localStorage.getItem('districtId') && !districts.some(d => d.id === localStorage.getItem('districtId')) ? localStorage.getItem('districtId') : null);
+      ? (initialData?.district && !districts.some(d => d.id === initialData.districtId) ? initialData.districtId : null)
+      : (!canSelectAnyDistrict && userDistrictId && !districts.some(d => d.id === userDistrictId) ? userDistrictId : null);
     if (legacyId) {
-      const legacyLabel = isEdit ? initialData.district.name : (localStorage.getItem('districtName') || 'Unknown');
+      const legacyLabel = isEdit ? initialData?.district?.name : (userDistrictName || 'Unknown');
       opts.push({ value: legacyId, label: legacyLabel });
     }
     return opts;
   })();
+
+  // Filter designations belonging to the currently selected district
+  const designationOptions = useMemo(() => {
+    if (!watchedDistrictId) return [];
+    const matching = allDesignations.filter(d => d.districtId === watchedDistrictId);
+    const opts = matching.map(d => ({
+      value: d.name,
+      label: d.name
+    }));
+
+    // In edit mode, if initial designation is not in filtered list, preserve it as an option
+    if (isEdit && initialData?.designation && !opts.some(o => o.value === initialData.designation)) {
+      opts.unshift({ value: initialData.designation, label: `${initialData.designation} (Current)` });
+    }
+
+    return opts;
+  }, [allDesignations, watchedDistrictId, isEdit, initialData?.designation]);
+
+  // When user changes district, clear the designation field if it was set for another district
+  const prevDistrictRef = useRef(isEdit ? initialData?.districtId : (canSelectAnyDistrict ? '' : userDistrictId));
+  useEffect(() => {
+    if (prevDistrictRef.current && prevDistrictRef.current !== watchedDistrictId) {
+      setValue('designation', '', { shouldValidate: true });
+    }
+    prevDistrictRef.current = watchedDistrictId;
+  }, [watchedDistrictId, setValue]);
 
   const onSubmit = async (data) => {
     const payload = {
@@ -119,6 +164,7 @@ function OfficerFormInner({ initialData, districts }) {
       });
 
       if (res.ok) {
+        showSuccess?.(isEdit ? 'Officer updated successfully.' : 'Officer added successfully.');
         navigate(isEdit ? `/officers/${initialData.id}` : '/officers');
       } else {
         const err = await res.json().catch(() => ({}));
@@ -163,7 +209,7 @@ function OfficerFormInner({ initialData, districts }) {
                     label="Select District"
                     placeholder="Select District"
                     error={!!errors.districtId}
-                    disabled={localStorage.getItem('isHeadOffice') !== '1'}
+                    disabled={!canSelectAnyDistrict}
                   />
                 )}
               />
@@ -176,16 +222,33 @@ function OfficerFormInner({ initialData, districts }) {
             </div>
             <div className="flex flex-col gap-1.5">
               <label className="text-[12.5px] font-semibold text-ink-text-soft">Designation <span className="text-brick">*</span></label>
-              <input type="text" className={`app-input ${errors.designation ? 'input-error' : ''}`} placeholder="e.g. SP, DSP, Inspector" {...register('designation')} />
+              <Controller
+                name="designation"
+                control={control}
+                render={({ field }) => (
+                  <SearchableSelect
+                    value={field.value}
+                    onChange={field.onChange}
+                    options={designationOptions}
+                    label="Select Designation"
+                    placeholder={watchedDistrictId ? (designationOptions.length > 0 ? "Select Designation" : "No designations for this district in Masters") : "Select District first"}
+                    error={!!errors.designation}
+                    disabled={!watchedDistrictId || designationOptions.length === 0}
+                  />
+                )}
+              />
               {errors.designation && <span className="text-brick text-xs">{errors.designation.message}</span>}
+              {!watchedDistrictId && (
+                <span className="text-ink-text-faint text-[11px]">Select a district above first</span>
+              )}
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[12.5px] font-semibold text-ink-text-soft">Mobile Number <span className="text-brick">*</span></label>
+              <label className="text-[12.5px] font-semibold text-ink-text-soft">Mobile Number</label>
               <input type="text" className={`app-input ${errors.mobile ? 'input-error' : ''}`} placeholder="10-digit number" maxLength={10} {...register('mobile')} />
               {errors.mobile && <span className="text-brick text-xs">{errors.mobile.message}</span>}
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[12.5px] font-semibold text-ink-text-soft">Reporting Date <span className="text-brick">*</span></label>
+              <label className="text-[12.5px] font-semibold text-ink-text-soft">Reporting Date</label>
               <input type="date" className={`app-input ${errors.reportingDate ? 'input-error' : ''}`} {...register('reportingDate')} />
               {errors.reportingDate && <span className="text-brick text-xs">{errors.reportingDate.message}</span>}
             </div>
@@ -200,12 +263,12 @@ function OfficerFormInner({ initialData, districts }) {
           <h4 className="text-[15px] text-ink-text mb-[18px] font-serif font-semibold">Address Information</h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="flex flex-col gap-1.5">
-              <label className="text-[12.5px] font-semibold text-ink-text-soft">Present Residence Address <span className="text-brick">*</span></label>
+              <label className="text-[12.5px] font-semibold text-ink-text-soft">Present Residence Address</label>
               <textarea className={`app-input ${errors.presentAddress ? 'input-error' : ''}`} rows={2} placeholder="Full present address" {...register('presentAddress')} />
               {errors.presentAddress && <span className="text-brick text-xs">{errors.presentAddress.message}</span>}
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[12.5px] font-semibold text-ink-text-soft">Permanent Address <span className="text-brick">*</span></label>
+              <label className="text-[12.5px] font-semibold text-ink-text-soft">Permanent Address</label>
               <textarea className={`app-input ${errors.permanentAddress ? 'input-error' : ''}`} rows={2} placeholder="Full permanent address" {...register('permanentAddress')} />
               {errors.permanentAddress && <span className="text-brick text-xs">{errors.permanentAddress.message}</span>}
             </div>

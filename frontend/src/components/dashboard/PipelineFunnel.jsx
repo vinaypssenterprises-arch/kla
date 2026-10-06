@@ -19,7 +19,7 @@ export default function PipelineFunnel({ pipeline = [] }) {
           <div className="flex items-center gap-2">
             <span className="inline-block w-2.5 h-2.5 rounded-full bg-brass animate-pulse" />
             <h3 className="text-base font-serif font-bold text-ink-text">
-              Section 17-A Case Progression
+              Section 17-A
             </h3>
           </div>
         </div>
