@@ -8,7 +8,7 @@ import {
 import {
   BarChart3, MapPin, Briefcase, Shield, Download, Search,
   Calendar, Table, Filter, CheckCircle2, Clock, XCircle, FileSpreadsheet,
-  RefreshCw, ArrowUpRight, Maximize2, Minimize2, RotateCcw, Check
+  RefreshCw, ArrowUpRight, Maximize2, Minimize2, RotateCcw, Check, Sparkles, TrendingUp
 } from 'lucide-react';
 import { exportDistrictProposalsStatisticsExcel } from '../lib/exportExcel';
 import { useToast } from '../components/ui/ToastProvider';
@@ -166,8 +166,8 @@ export default function Reports() {
   const [dbDistricts, setDbDistricts] = useState([]);
   const [chartExtraData, setChartExtraData] = useState(null);
 
-  // Filters state
-  const [focusYear, setFocusYear] = useState(new Date().getFullYear());
+  // Filters state (Defaults to 'ALL' - All Years Cumulative)
+  const [focusYear, setFocusYear] = useState('ALL');
   const [selectedDistrict, setSelectedDistrict] = useState('');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
@@ -230,19 +230,46 @@ export default function Reports() {
     return list;
   }, [dbDistricts]);
 
-  // Historical Years list: 2017 up to focusYear - 1
+  const currentYear = useMemo(() => new Date().getFullYear(), []);
+
+  // Dynamically compute available years (from current year down to 2017, plus any found in petitions data)
+  const availableYears = useMemo(() => {
+    const yearsSet = new Set();
+    for (let y = currentYear; y >= 2017; y--) {
+      yearsSet.add(y);
+    }
+    (rawPetitions || []).forEach(p => {
+      const y = getPetitionYear(p);
+      if (y && y >= 2000 && y <= currentYear + 1) {
+        yearsSet.add(y);
+      }
+    });
+    return Array.from(yearsSet).sort((a, b) => b - a);
+  }, [rawPetitions, currentYear]);
+
+  // Historical Years list:
+  // In ALL mode: shows full breakdown from 2017 up to currentYear
+  // In Single Year mode: shows 2017 up to focusYear - 1
   const historicalYears = useMemo(() => {
     const startYear = 2017;
     const years = [];
-    for (let y = startYear; y < focusYear; y++) {
-      years.push(y);
+    if (focusYear === 'ALL') {
+      for (let y = startYear; y <= currentYear; y++) {
+        years.push(y);
+      }
+    } else {
+      for (let y = startYear; y < focusYear; y++) {
+        years.push(y);
+      }
     }
     return years;
-  }, [focusYear]);
+  }, [focusYear, currentYear]);
 
   // Master Statistics Calculation (100% reactive to filters)
   const statsData = useMemo(() => {
+    const isAll = focusYear === 'ALL';
     const districtStatsMap = {};
+
     allOrderedDistricts.forEach(dist => {
       districtStatsMap[dist] = {
         district: dist,
@@ -281,12 +308,13 @@ export default function Reports() {
       const pDateStr = getPetitionDateStr(p);
       const row = districtStatsMap[normDist];
 
-      if (pYear < focusYear) {
+      if (isAll) {
+        // Record into yearly breakdown
         if (row.historical[pYear] !== undefined) {
           row.historical[pYear]++;
         }
-      } else if (pYear === focusYear) {
-        // Date range filtering (string-based YYYY-MM-DD comparison is timezone safe)
+
+        // Custom date range filtering if applied
         if (appliedFromDate && pDateStr < appliedFromDate) return;
         if (appliedToDate && pDateStr > appliedToDate) return;
 
@@ -323,6 +351,50 @@ export default function Reports() {
         if (isObtained) row.obtained++;
         if (isRejected) row.rejected++;
         if (isPendingWithCA) row.pendingWithCA++;
+      } else {
+        if (pYear < focusYear) {
+          if (row.historical[pYear] !== undefined) {
+            row.historical[pYear]++;
+          }
+        } else if (pYear === focusYear) {
+          // Date range filtering (string-based YYYY-MM-DD comparison is timezone safe)
+          if (appliedFromDate && pDateStr < appliedFromDate) return;
+          if (appliedToDate && pDateStr > appliedToDate) return;
+
+          row.totalReceivedAtHq++;
+
+          const propStatus = (p.proposalStatus || '').trim().toLowerCase();
+          const pStatus = (p.status || '').trim();
+
+          const isSentToCA = 
+            propStatus === 'accept' ||
+            pStatus === 'CA_SUBMITTED' ||
+            pStatus === '17A_PERMISSION_PENDING' ||
+            pStatus === '17A_PERMISSION_COMPLETED' ||
+            pStatus === 'PRELIMINARY_ENQUIRY_SUBMITTED' ||
+            p.proposalSentDate != null ||
+            (p.respondents && p.respondents.some(r => r.permissionSentDate || r.caDesignation));
+
+          const isSentBackToDist = 
+            propStatus.includes('returned') ||
+            pStatus === '17A_RETURNED';
+
+          const isObtained = p.respondents && p.respondents.some(r => 
+            (r.permissionStatus || '').trim().toLowerCase() === 'obtain'
+          );
+
+          const isRejected = p.respondents && p.respondents.some(r => 
+            (r.permissionStatus || '').trim().toLowerCase() === 'reject'
+          );
+
+          const isPendingWithCA = isSentToCA && !isObtained && !isRejected;
+
+          if (isSentToCA) row.proposalsSentToCA++;
+          if (isSentBackToDist) row.proposalsSentBackToDist++;
+          if (isObtained) row.obtained++;
+          if (isRejected) row.rejected++;
+          if (isPendingWithCA) row.pendingWithCA++;
+        }
       }
     });
 
@@ -386,10 +458,11 @@ export default function Reports() {
     setAppliedFromDate('');
     setAppliedToDate('');
     setSearchTerm('');
+    setFocusYear('ALL');
     showSuccess('Filters reset to default.');
   };
 
-  const hasActiveFilters = !!(appliedDistrict || appliedFromDate || appliedToDate);
+  const hasActiveFilters = !!(appliedDistrict || appliedFromDate || appliedToDate || focusYear !== 'ALL');
 
   // Filter rows for search term & active filter
   const displayedRows = useMemo(() => {
@@ -409,15 +482,17 @@ export default function Reports() {
   const handleExportStatisticsExcel = async () => {
     if (!displayedRows || displayedRows.length === 0) return;
     try {
+      const isAll = focusYear === 'ALL';
       const dateRangeLabel = appliedFromDate && appliedToDate
         ? `${appliedFromDate} to ${appliedToDate}`
-        : `${focusYear}`;
+        : (isAll ? 'All Years (Cumulative)' : `${focusYear}`);
 
       await exportDistrictProposalsStatisticsExcel({
         districtStats: displayedRows,
         totals: statsData.totals,
         historicalYears,
-        focusYear: dateRangeLabel
+        focusYear: dateRangeLabel,
+        isAllYears: isAll
       });
       showSuccess('17-A Statistics report exported successfully.');
     } catch (err) {
@@ -428,19 +503,40 @@ export default function Reports() {
 
   // Visual Chart Data
   const districtData = useMemo(() => {
+    const isAll = focusYear === 'ALL';
     return (statsData.districtStats || []).filter(r => {
-      const tot = (r.totalReceivedAtHq || 0) + Object.values(r.historical || {}).reduce((a, b) => a + b, 0);
+      const tot = isAll
+        ? (r.totalReceivedAtHq || 0)
+        : ((r.totalReceivedAtHq || 0) + Object.values(r.historical || {}).reduce((a, b) => a + b, 0));
       return tot > 0;
     }).map(r => ({
       district: r.district,
-      count: (r.totalReceivedAtHq || 0) + Object.values(r.historical || {}).reduce((a, b) => a + b, 0)
-    })).slice(0, 15);
-  }, [statsData.districtStats]);
+      count: isAll
+        ? (r.totalReceivedAtHq || 0)
+        : ((r.totalReceivedAtHq || 0) + Object.values(r.historical || {}).reduce((a, b) => a + b, 0))
+    })).sort((a, b) => b.count - a.count).slice(0, 15);
+  }, [statsData.districtStats, focusYear]);
+
+  // Year-over-Year Proposals Trend for Charts tab
+  const yearlyTrendData = useMemo(() => {
+    const counts = {};
+    for (let y = 2017; y <= currentYear; y++) {
+      counts[y] = 0;
+    }
+    (rawPetitions || []).forEach(p => {
+      const y = getPetitionYear(p);
+      if (y && y >= 2017 && y <= currentYear) {
+        counts[y] = (counts[y] || 0) + 1;
+      }
+    });
+    return Object.keys(counts).map(y => ({
+      year: y,
+      proposals: counts[y]
+    }));
+  }, [rawPetitions, currentYear]);
 
   const peStatusData = chartExtraData?.petitionsByPeStatus || [];
   const officerDistData = (chartExtraData?.officersByDistrict || []).filter(r => r.count > 0).slice(0, 12);
-
-  const yearOptions = [2026, 2025, 2024, 2023, 2022, 2021];
 
   return (
     <div style={{ animation: 'fadeSlideIn 0.3s ease-out' }} className="pb-16">
@@ -527,14 +623,20 @@ export default function Reports() {
         <div className="bg-[#FFFDF7] border border-rule/80 rounded-xl p-3.5 shadow-soft">
           <div className="text-[11.5px] font-semibold text-ink-text-soft uppercase tracking-wider mb-1 flex items-center justify-between">
             <span>Received at HQ</span>
-            <span className="text-[10px] font-mono px-1.5 py-0.2 bg-blue-50 text-blue-700 rounded border border-blue-200">
-              {appliedFromDate && appliedToDate ? 'Range' : focusYear}
+            <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded border ${
+              focusYear === 'ALL'
+                ? 'bg-amber-100 text-amber-900 border-amber-300 font-bold'
+                : 'bg-blue-50 text-blue-700 border-blue-200'
+            }`}>
+              {appliedFromDate && appliedToDate ? 'Range' : focusYear === 'ALL' ? 'All Years' : focusYear}
             </span>
           </div>
           <div className="text-[23px] font-serif font-bold text-ink-text">
             {statsData.totals.totalReceivedAtHq || 0}
           </div>
-          <div className="text-[11px] text-ink-text-faint mt-0.5">Total registered proposals</div>
+          <div className="text-[11px] text-ink-text-faint mt-0.5">
+            {focusYear === 'ALL' ? 'Total registered (All Years)' : `Total registered in ${focusYear}`}
+          </div>
         </div>
 
         <div className="bg-[#FFFDF7] border border-rule/80 rounded-xl p-3.5 shadow-soft">
@@ -544,7 +646,9 @@ export default function Reports() {
           <div className="text-[23px] font-serif font-bold text-indigo-900">
             {statsData.totals.proposalsSentToCA || 0}
           </div>
-          <div className="text-[11px] text-ink-text-faint mt-0.5">Dispatched for sanction</div>
+          <div className="text-[11px] text-ink-text-faint mt-0.5">
+            {focusYear === 'ALL' ? 'Total dispatched to CA' : 'Dispatched for sanction'}
+          </div>
         </div>
 
         <div className="bg-[#FFFDF7] border border-rule/80 rounded-xl p-3.5 shadow-soft">
@@ -554,7 +658,9 @@ export default function Reports() {
           <div className="text-[23px] font-serif font-bold text-amber-900">
             {statsData.totals.proposalsSentBackToDist || 0}
           </div>
-          <div className="text-[11px] text-ink-text-faint mt-0.5">Returned with remarks</div>
+          <div className="text-[11px] text-ink-text-faint mt-0.5">
+            {focusYear === 'ALL' ? 'Total returned to district' : 'Returned with remarks'}
+          </div>
         </div>
 
         <div className="bg-[#FFFDF7] border border-rule/80 rounded-xl p-3.5 shadow-soft">
@@ -565,7 +671,9 @@ export default function Reports() {
           <div className="text-[23px] font-serif font-bold text-emerald-900">
             {statsData.totals.obtained || 0}
           </div>
-          <div className="text-[11px] text-ink-text-faint mt-0.5">Sanctions granted</div>
+          <div className="text-[11px] text-ink-text-faint mt-0.5">
+            {focusYear === 'ALL' ? 'Total sanctions granted' : 'Sanctions granted'}
+          </div>
         </div>
 
         <div className="bg-[#FFFDF7] border border-rule/80 rounded-xl p-3.5 shadow-soft">
@@ -576,7 +684,9 @@ export default function Reports() {
           <div className="text-[23px] font-serif font-bold text-rose-900">
             {statsData.totals.rejected || 0}
           </div>
-          <div className="text-[11px] text-ink-text-faint mt-0.5">Sanctions refused</div>
+          <div className="text-[11px] text-ink-text-faint mt-0.5">
+            {focusYear === 'ALL' ? 'Total sanctions refused' : 'Sanctions refused'}
+          </div>
         </div>
 
         <div className="bg-[#FFFDF7] border border-rule/80 rounded-xl p-3.5 shadow-soft bg-gradient-to-br from-amber-50/60 to-[#FFFDF7]">
@@ -587,7 +697,9 @@ export default function Reports() {
           <div className="text-[23px] font-serif font-bold text-[#7E2A34]">
             {statsData.totals.pendingWithCA || 0}
           </div>
-          <div className="text-[11px] text-ink-text-faint mt-0.5">Awaiting sanction</div>
+          <div className="text-[11px] text-ink-text-faint mt-0.5">
+            {focusYear === 'ALL' ? 'Total awaiting sanction' : 'Awaiting sanction'}
+          </div>
         </div>
       </div>
 
@@ -667,38 +779,76 @@ export default function Reports() {
             )}
           </div>
 
-          {/* Right: Active Year Selector */}
+          {/* Right: Year Filter Selector with All Years & Quick Toggle */}
           <div className="flex items-center gap-2">
-            <label className="text-[12px] font-bold text-ink-text flex items-center gap-1">
+            <label className="text-[12px] font-bold text-ink-text flex items-center gap-1.5">
               <Calendar className="w-3.5 h-3.5 text-[#A97B33]" />
-              Historical Year:
+              Year Filter:
             </label>
-            <select
-              value={focusYear}
-              onChange={(e) => setFocusYear(parseInt(e.target.value))}
-              className="bg-white border border-rule rounded-lg px-2.5 py-1.5 text-[12.5px] font-bold text-ink-text focus:outline-none focus:ring-2 focus:ring-[#000E89]/20"
-            >
-              {yearOptions.map(y => (
-                <option key={y} value={y}>{y}</option>
-              ))}
-            </select>
+            <div className="flex items-center gap-1.5">
+              <select
+                value={focusYear}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setFocusYear(val === 'ALL' ? 'ALL' : parseInt(val, 10));
+                }}
+                className={`border rounded-lg px-2.5 py-1.5 text-[12.5px] font-bold focus:outline-none focus:ring-2 transition shadow-2xs cursor-pointer ${
+                  focusYear === 'ALL'
+                    ? 'bg-amber-50 text-amber-950 border-amber-300 focus:ring-amber-500/20'
+                    : 'bg-white text-ink-text border-rule focus:ring-[#000E89]/20'
+                }`}
+              >
+                <option value="ALL">✨ All Years (Cumulative)</option>
+                <optgroup label="Specific Focus Year">
+                  {availableYears.map(y => (
+                    <option key={y} value={y}>
+                      Year {y} {y === currentYear ? '(Current)' : ''}
+                    </option>
+                  ))}
+                </optgroup>
+              </select>
+
+              {focusYear === 'ALL' ? (
+                <button
+                  type="button"
+                  onClick={() => setFocusYear(currentYear)}
+                  className="px-2.5 py-1 rounded-md text-[11px] font-bold bg-white hover:bg-stone-100 text-stone-700 border border-rule transition shadow-2xs whitespace-nowrap"
+                  title={`Switch to ${currentYear} only`}
+                >
+                  Year {currentYear}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setFocusYear('ALL')}
+                  className="px-2.5 py-1 rounded-md text-[11px] font-bold bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 transition shadow-2xs whitespace-nowrap flex items-center gap-1"
+                  title="Switch to All Years cumulative view"
+                >
+                  <Sparkles className="w-3 h-3 text-amber-700" />
+                  All Years
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
         {/* Active Filters Summary Pill */}
-        {hasActiveFilters && (
+        {(hasActiveFilters || focusYear === 'ALL') && (
           <div className="flex items-center gap-2 pt-2 border-t border-rule/40 text-[11.5px] text-amber-900 bg-amber-50/70 px-3 py-1.5 rounded-lg border border-amber-200">
-            <span className="font-bold">Active Filters Applied:</span>
-            <span>{appliedDistrict ? `Unit: ${appliedDistrict}` : 'All Units'}</span>
+            <span className="font-bold">Active Scope:</span>
+            <span>{focusYear === 'ALL' ? `All Years (2017 – ${currentYear} Cumulative)` : `Year ${focusYear}`}</span>
+            <span>• {appliedDistrict ? `Unit: ${appliedDistrict}` : 'All Units (33 Districts)'}</span>
             {appliedFromDate && <span>• From: <strong>{appliedFromDate}</strong></span>}
             {appliedToDate && <span>• To: <strong>{appliedToDate}</strong></span>}
-            <button
-              type="button"
-              onClick={handleResetFilter}
-              className="ml-auto text-amber-800 hover:text-rose-700 font-bold flex items-center gap-1 underline"
-            >
-              Reset to All
-            </button>
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={handleResetFilter}
+                className="ml-auto text-amber-800 hover:text-rose-700 font-bold flex items-center gap-1 underline"
+              >
+                Reset Filters
+              </button>
+            )}
           </div>
         )}
 
@@ -768,8 +918,13 @@ export default function Reports() {
                 Section 17-A Proposal Statistics
               </span>
               <span className="text-[11.5px] text-ink-text-soft">
-                — {displayedRows.length} units ({appliedFromDate && appliedToDate ? `${appliedFromDate} to ${appliedToDate}` : `${focusYear} Status`})
+                — {displayedRows.length} units ({appliedFromDate && appliedToDate ? `${appliedFromDate} to ${appliedToDate}` : focusYear === 'ALL' ? `All Years Cumulative: 2017 – ${currentYear}` : `Year ${focusYear} Status`})
               </span>
+              {focusYear === 'ALL' && (
+                <span className="px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs">
+                  All Years View
+                </span>
+              )}
             </div>
             <div className="text-[11px] text-ink-text-faint">
               * Units with 0 are explicitly displayed. Click district name to open petitions.
@@ -801,14 +956,22 @@ export default function Reports() {
                     style={{ position: 'sticky', top: 0, zIndex: 15 }}
                     className="py-2 px-3 text-center tracking-wider uppercase bg-[#1F2C48] border border-[#2D3A54] text-amber-100 text-[11.5px]"
                   >
-                    17-A Proposals ({historicalYears[0]} - {historicalYears[historicalYears.length - 1]})
+                    {focusYear === 'ALL'
+                      ? `17-A Proposals by Year (${historicalYears[0]} - ${historicalYears[historicalYears.length - 1]})`
+                      : `17-A Proposals (${historicalYears.length > 0 ? `${historicalYears[0]} - ${historicalYears[historicalYears.length - 1]}` : focusYear})`
+                    }
                   </th>
                   <th
                     colSpan={6}
                     style={{ position: 'sticky', top: 0, zIndex: 15 }}
                     className="py-2 px-3 text-center tracking-wider uppercase bg-[#7E2A34] border border-[#9A3542] text-amber-200 text-[11.5px]"
                   >
-                    {appliedFromDate && appliedToDate ? `Period: ${appliedFromDate} to ${appliedToDate}` : `Year ${focusYear} Status & Action`}
+                    {appliedFromDate && appliedToDate
+                      ? `Period: ${appliedFromDate} to ${appliedToDate}`
+                      : focusYear === 'ALL'
+                      ? 'All Years Cumulative Status & Action'
+                      : `Year ${focusYear} Status & Action`
+                    }
                   </th>
                 </tr>
 
@@ -825,37 +988,43 @@ export default function Reports() {
                   ))}
                   <th
                     style={{ position: 'sticky', top: '33px', zIndex: 15, minWidth: '105px' }}
-                    className="py-2 px-2 text-center bg-blue-100/90 border border-blue-200 text-blue-950 font-semibold"
+                    className="py-2 px-2 text-center bg-blue-100/90 border border-blue-200 text-blue-950 font-semibold cursor-help"
+                    title={focusYear === 'ALL' ? "Total proposals received across all recorded years" : `Total proposals received in ${focusYear}`}
                   >
                     Total Received at HQ
                   </th>
                   <th
                     style={{ position: 'sticky', top: '33px', zIndex: 15, minWidth: '95px' }}
-                    className="py-2 px-2 text-center bg-indigo-100/90 border border-indigo-200 text-indigo-950 font-semibold"
+                    className="py-2 px-2 text-center bg-indigo-100/90 border border-indigo-200 text-indigo-950 font-semibold cursor-help"
+                    title="Proposals dispatched to Competent Authority for sanction"
                   >
                     Proposals Sent to CA
                   </th>
                   <th
                     style={{ position: 'sticky', top: '33px', zIndex: 15, minWidth: '100px' }}
-                    className="py-2 px-2 text-center bg-amber-100/90 border border-amber-200 text-amber-950 font-semibold"
+                    className="py-2 px-2 text-center bg-amber-100/90 border border-amber-200 text-amber-950 font-semibold cursor-help"
+                    title="Proposals sent back to SP / district unit with remarks"
                   >
                     Sent back to Dist
                   </th>
                   <th
                     style={{ position: 'sticky', top: '33px', zIndex: 15, minWidth: '80px' }}
-                    className="py-2 px-2 text-center bg-emerald-100/90 border border-emerald-200 text-emerald-950 font-semibold"
+                    className="py-2 px-2 text-center bg-emerald-100/90 border border-emerald-200 text-emerald-950 font-semibold cursor-help"
+                    title="Sanctions obtained from Competent Authority under Section 17-A"
                   >
                     Obtained
                   </th>
                   <th
                     style={{ position: 'sticky', top: '33px', zIndex: 15, minWidth: '80px' }}
-                    className="py-2 px-2 text-center bg-rose-100/90 border border-rose-200 text-rose-950 font-semibold"
+                    className="py-2 px-2 text-center bg-rose-100/90 border border-rose-200 text-rose-950 font-semibold cursor-help"
+                    title="Sanctions rejected/refused by Competent Authority"
                   >
                     Rejected
                   </th>
                   <th
                     style={{ position: 'sticky', top: '33px', zIndex: 15, minWidth: '95px' }}
-                    className="py-2 px-2 text-center bg-amber-200/90 border border-amber-300 text-[#7E2A34] font-bold"
+                    className="py-2 px-2 text-center bg-amber-200/90 border border-amber-300 text-[#7E2A34] font-bold cursor-help"
+                    title="Sanctions currently awaiting decision from Competent Authority"
                   >
                     Pending with CA
                   </th>
@@ -1097,27 +1266,69 @@ export default function Reports() {
       {/* Graphical Breakdown View */}
       {activeTab === 'charts' && (
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mt-2">
+          {/* Yearly Proposals Trend Progression Bar Chart */}
+          <div className="bg-[#FFFDF7] border border-rule rounded-xl p-6 shadow-soft">
+            <SectionHeader
+              icon={TrendingUp}
+              title={`Yearly Proposals Inflow (2017 – ${currentYear})`}
+              subtitle="Annual registration volume of Section 17-A proposals across all jurisdictions"
+            />
+            {loading ? <SkeletonChart /> : yearlyTrendData.length === 0 ? <EmptyChart label="No annual trend recorded." /> : (
+              <ResponsiveContainer width="100%" height={260}>
+                <BarChart data={yearlyTrendData} margin={{ top: 10, right: 15, left: -15, bottom: 20 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(16,24,38,0.06)" />
+                  <XAxis
+                    dataKey="year"
+                    tick={{ fontSize: 11, fill: '#6E6248', fontWeight: 600 }}
+                  />
+                  <YAxis tick={{ fontSize: 11, fill: '#6E6248' }} allowDecimals={false} />
+                  <Tooltip
+                    content={({ active, payload, label }) => {
+                      if (!active || !payload?.length) return null;
+                      return (
+                        <div className="bg-ink border border-white/15 rounded-xl px-4 py-2.5 shadow-deep text-[12.5px]">
+                          <div className="font-bold text-[#F5EFE1]">Year {label}</div>
+                          <div className="text-amber-300 font-semibold mt-0.5">
+                            Proposals: <strong>{payload[0].value}</strong>
+                          </div>
+                        </div>
+                      );
+                    }}
+                  />
+                  <Bar dataKey="proposals" name="Proposals" fill="#000E89" radius={[5, 5, 0, 0]} maxBarSize={38}>
+                    {yearlyTrendData.map((entry, idx) => (
+                      <Cell
+                        key={`cell-${idx}`}
+                        fill={entry.year === String(focusYear) ? '#A97B33' : '#000E89'}
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+
           {/* District-wise Petitions Bar Chart */}
-          <div className="bg-[#FFFDF7] border border-rule rounded-xl p-6 shadow-soft col-span-1 xl:col-span-2">
+          <div className="bg-[#FFFDF7] border border-rule rounded-xl p-6 shadow-soft">
             <SectionHeader
               icon={MapPin}
-              title="Petitions by District"
-              subtitle="Registered Section 17-A petitions per active district unit"
+              title={focusYear === 'ALL' ? "Top Units by Petitions (All-Time)" : `Top Units by Petitions (${focusYear})`}
+              subtitle="Registered Section 17-A proposals by police unit jurisdiction"
             />
             {loading ? <SkeletonChart /> : districtData.length === 0 ? <EmptyChart label="No district data recorded yet." /> : (
-              <ResponsiveContainer width="100%" height={280}>
-                <BarChart data={districtData} margin={{ top: 5, right: 10, left: -10, bottom: 60 }}>
+              <ResponsiveContainer width="100%" height={260}>
+                <BarChart data={districtData} margin={{ top: 5, right: 10, left: -15, bottom: 60 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(16,24,38,0.06)" />
                   <XAxis
                     dataKey="district"
-                    tick={{ fontSize: 11, fill: '#6E6248' }}
+                    tick={{ fontSize: 10, fill: '#6E6248' }}
                     angle={-40}
                     textAnchor="end"
                     interval={0}
                   />
                   <YAxis tick={{ fontSize: 11, fill: '#6E6248' }} allowDecimals={false} />
                   <Tooltip content={<CustomBarTooltip />} />
-                  <Bar dataKey="count" name="Petitions" radius={[5, 5, 0, 0]} maxBarSize={40}>
+                  <Bar dataKey="count" name="Petitions" radius={[5, 5, 0, 0]} maxBarSize={32}>
                     {districtData.map((_, i) => (
                       <Cell key={i} fill={PALETTE[i % PALETTE.length]} />
                     ))}

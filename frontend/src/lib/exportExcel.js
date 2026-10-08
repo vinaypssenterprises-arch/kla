@@ -537,7 +537,14 @@ export async function exportOfficersToExcel({ search = '', districtId = '', desi
   saveAs(blob, fileName);
 }
 
-export async function exportDistrictProposalsStatisticsExcel({ districtStats = [], totals = {}, historicalYears = [], focusYear = 2026 } = {}) {
+export async function exportDistrictProposalsStatisticsExcel({
+  districtStats = [],
+  totals = {},
+  historicalYears = [],
+  focusYear = 2026,
+  isAllYears = false
+} = {}) {
+  const isAll = Boolean(isAllYears || focusYear === 'ALL' || String(focusYear).toLowerCase().includes('all'));
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'Karnataka Lokayukta Police';
   workbook.created = new Date();
@@ -603,7 +610,9 @@ export async function exportDistrictProposalsStatisticsExcel({ districtStats = [
   // Merge "17-A Proposals" (C1 to endHistCol)
   sheet.mergeCells(1, startHistCol, 1, endHistCol);
   const cellHistGroup = sheet.getCell(1, startHistCol);
-  cellHistGroup.value = '17-A Proposals';
+  cellHistGroup.value = isAll
+    ? (historicalYears.length > 0 ? `17-A Proposals by Year (${historicalYears[0]} - ${historicalYears[historicalYears.length - 1]})` : '17-A Proposals by Year')
+    : (historicalYears.length > 0 ? `17-A Proposals (${historicalYears[0]} - ${historicalYears[historicalYears.length - 1]})` : '17-A Proposals');
   cellHistGroup.alignment = { horizontal: 'center', vertical: 'middle' };
   cellHistGroup.font = { name: 'Arial', size: 10, bold: true };
   cellHistGroup.fill = headerFill;
@@ -611,7 +620,7 @@ export async function exportDistrictProposalsStatisticsExcel({ districtStats = [
   // Merge Focus Year (e.g. 2026) (startFocusCol to endFocusCol)
   sheet.mergeCells(1, startFocusCol, 1, endFocusCol);
   const cellFocusGroup = sheet.getCell(1, startFocusCol);
-  cellFocusGroup.value = `${focusYear}`;
+  cellFocusGroup.value = isAll ? 'Cumulative Status & Action (All Years)' : `${focusYear} Status & Action`;
   cellFocusGroup.alignment = { horizontal: 'center', vertical: 'middle' };
   cellFocusGroup.font = { name: 'Arial', size: 10, bold: true };
   cellFocusGroup.fill = headerFill;
@@ -739,6 +748,7 @@ export async function exportDistrictProposalsStatisticsExcel({ districtStats = [
 
   const buffer = await workbook.xlsx.writeBuffer();
   const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-  const fileName = `17-A_District_Proposals_Statistics_${focusYear}.xlsx`;
+  const cleanYear = isAll ? 'All_Years' : String(focusYear).replace(/[^a-zA-Z0-9_-]/g, '_');
+  const fileName = `17-A_District_Proposals_Statistics_${cleanYear}.xlsx`;
   saveAs(blob, fileName);
 }

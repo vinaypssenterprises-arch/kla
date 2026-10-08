@@ -125,12 +125,20 @@ router.get('/reports', async (req, res) => {
 
     let fromDate = fromDateStr ? new Date(`${fromDateStr}T00:00:00.000Z`) : null;
     let toDate = toDateStr ? new Date(`${toDateStr}T23:59:59.999Z`) : null;
-    const focusYear = fromDate ? fromDate.getFullYear() : (parseInt(req.query.year) || new Date().getFullYear());
+    const currentYear = new Date().getFullYear();
+    const isAllYears = req.query.year === 'ALL';
+    const focusYear = isAllYears ? 'ALL' : (fromDate ? fromDate.getFullYear() : (parseInt(req.query.year) || currentYear));
 
     const startYear = 2017;
     const historicalYears = [];
-    for (let y = startYear; y < focusYear; y++) {
-      historicalYears.push(y);
+    if (isAllYears) {
+      for (let y = startYear; y <= currentYear; y++) {
+        historicalYears.push(y);
+      }
+    } else {
+      for (let y = startYear; y < focusYear; y++) {
+        historicalYears.push(y);
+      }
     }
 
     const [allDbDistricts, petitions, peGroups, officersByDistrict] = await Promise.all([
@@ -191,11 +199,10 @@ router.get('/reports', async (req, res) => {
       const pDate = getPetitionDate(p);
       const row = districtStatsMap[normDist];
 
-      if (pYear < focusYear) {
+      if (isAllYears) {
         if (row.historical[pYear] !== undefined) {
           row.historical[pYear]++;
         }
-      } else if (pYear === focusYear) {
         if (fromDate && pDate < fromDate) return;
         if (toDate && pDate > toDate) return;
 
@@ -232,6 +239,49 @@ router.get('/reports', async (req, res) => {
         if (isObtained) row.obtained++;
         if (isRejected) row.rejected++;
         if (isPendingWithCA) row.pendingWithCA++;
+      } else {
+        if (pYear < focusYear) {
+          if (row.historical[pYear] !== undefined) {
+            row.historical[pYear]++;
+          }
+        } else if (pYear === focusYear) {
+          if (fromDate && pDate < fromDate) return;
+          if (toDate && pDate > toDate) return;
+
+          row.totalReceivedAtHq++;
+
+          const propStatus = (p.proposalStatus || '').trim().toLowerCase();
+          const pStatus = (p.status || '').trim();
+
+          const isSentToCA = 
+            propStatus === 'accept' ||
+            pStatus === 'CA_SUBMITTED' ||
+            pStatus === '17A_PERMISSION_PENDING' ||
+            pStatus === '17A_PERMISSION_COMPLETED' ||
+            pStatus === 'PRELIMINARY_ENQUIRY_SUBMITTED' ||
+            p.proposalSentDate != null ||
+            (p.respondents && p.respondents.some(r => r.permissionSentDate || r.caDesignation));
+
+          const isSentBackToDist = 
+            propStatus.includes('returned') ||
+            pStatus === '17A_RETURNED';
+
+          const isObtained = p.respondents && p.respondents.some(r => 
+            (r.permissionStatus || '').trim().toLowerCase() === 'obtain'
+          );
+
+          const isRejected = p.respondents && p.respondents.some(r => 
+            (r.permissionStatus || '').trim().toLowerCase() === 'reject'
+          );
+
+          const isPendingWithCA = isSentToCA && !isObtained && !isRejected;
+
+          if (isSentToCA) row.proposalsSentToCA++;
+          if (isSentBackToDist) row.proposalsSentBackToDist++;
+          if (isObtained) row.obtained++;
+          if (isRejected) row.rejected++;
+          if (isPendingWithCA) row.pendingWithCA++;
+        }
       }
     });
 
@@ -272,7 +322,7 @@ router.get('/reports', async (req, res) => {
 
     const petitionsByDistrict = districtStats.map(d => ({
       district: d.district,
-      count: d.totalReceivedAtHq + Object.values(d.historical).reduce((a, b) => a + b, 0)
+      count: isAllYears ? d.totalReceivedAtHq : (d.totalReceivedAtHq + Object.values(d.historical).reduce((a, b) => a + b, 0))
     }));
 
     res.json({

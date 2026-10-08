@@ -1113,19 +1113,19 @@ export default function RegisterList() {
           </div>
 
           <div ref={tableContainerRef} className="overflow-x-auto" style={{ scrollBehavior: 'smooth' }}>
-            <table className="data-table min-w-[1380px] w-full">
+            <table className="data-table min-w-[1180px] w-full">
               <thead>
                 <tr>
-                  <th className="w-[60px] min-w-[60px] text-center">Case #</th>
-                  <th className="w-[56px] min-w-[56px] text-center">Action</th>
-                  <th className="min-w-[130px]">District</th>
-                  <th className="min-w-[170px]">Petition No.</th>
-                  <th className="min-w-[170px]">Petitioner</th>
-                  <th className="min-w-[220px]">Respondents</th>
-                  <th className="min-w-[110px] text-center">Proposal</th>
-                  <th className="min-w-[120px] text-center">Permission</th>
-                  <th className="min-w-[140px] text-center">PE No. & Date</th>
-                  <th className="min-w-[140px] text-center">PE Status</th>
+                  <th className="w-[54px] min-w-[54px] text-center">Case #</th>
+                  <th className="w-[52px] min-w-[52px] text-center">Action</th>
+                  <th className="w-[130px] min-w-[120px]">District</th>
+                  <th className="w-[160px] min-w-[150px]">Petition No.</th>
+                  <th className="w-[160px] min-w-[140px]">Petitioner</th>
+                  <th className="w-[240px] min-w-[200px] max-w-[280px]">Respondents</th>
+                  <th className="w-[95px] min-w-[90px] text-center">Proposal</th>
+                  <th className="w-[105px] min-w-[100px] text-center">Permission</th>
+                  <th className="w-[125px] min-w-[120px] text-center">PE No. & Date</th>
+                  <th className="w-[125px] min-w-[120px] text-center">PE Status</th>
                 </tr>
               </thead>
               <tbody>
@@ -1146,22 +1146,22 @@ export default function RegisterList() {
                         onClick={() => handleOpenView(entry)}
                         className={`group transition-all duration-150 cursor-pointer case-row ${
                           idx % 2 === 0 ? 'case-row-odd' : 'case-row-even'
-                        } ${tableDensity === 'compact' ? 'text-[12px]' : 'text-[13px]'}`}
+                        } ${tableDensity === 'compact' ? 'text-[12px]' : 'text-[12.5px]'}`}
                       >
                         {/* Case Number Badge */}
-                        <td className={`text-center align-middle ${tableDensity === 'compact' ? 'px-2 py-1.5' : 'px-2 py-3'}`}>
+                        <td className={`text-center align-middle ${tableDensity === 'compact' ? 'px-2 py-1' : 'px-2 py-2'}`}>
                           <div className="flex flex-col items-center justify-center gap-0.5">
-                            <span className={`inline-flex items-center justify-center min-w-[26px] ${tableDensity === 'compact' ? 'h-6 text-[11px]' : 'h-7 text-[12px]'} px-1.5 rounded-md bg-[#000E89] text-white font-mono font-bold shadow-xs`}>
+                            <span className={`inline-flex items-center justify-center min-w-[24px] ${tableDensity === 'compact' ? 'h-5 text-[10.5px]' : 'h-6 text-[11px]'} px-1 rounded-md bg-[#000E89] text-white font-mono font-bold shadow-xs`}>
                               {(page - 1) * pageSize + idx + 1}
                             </span>
-                            <span className="text-[9px] font-bold tracking-wider text-[#7C88A2] uppercase">
+                            <span className="text-[8.5px] font-bold tracking-wider text-[#7C88A2] uppercase">
                               Case
                             </span>
                           </div>
                         </td>
 
                         {/* Actions (placed immediately after Case # / SL No) */}
-                        <td onClick={e => e.stopPropagation()} className={`text-center px-2 align-middle ${tableDensity === 'compact' ? 'py-1.5' : 'py-3'}`}>
+                        <td onClick={e => e.stopPropagation()} className={`text-center px-1.5 align-middle ${tableDensity === 'compact' ? 'py-1' : 'py-2'}`}>
                           <button
                             type="button"
                             className={`w-7 h-7 rounded-lg inline-flex items-center justify-center transition-all border ${
@@ -1172,30 +1172,30 @@ export default function RegisterList() {
                             title="Manage Case"
                             onClick={(e) => handleToggleActionMenu(e, entry)}
                           >
-                            <Settings2 className="w-4 h-4" />
+                            <Settings2 className="w-3.5 h-3.5" />
                           </button>
                         </td>
 
                         {/* District */}
-                        <td className={`whitespace-nowrap ${tableDensity === 'compact' ? 'py-1.5 px-3' : 'py-3.5 px-4'}`}>
-                          <div className="flex items-center gap-1.5 font-semibold text-ink-text text-[13px]">
+                        <td className={`whitespace-nowrap align-middle ${tableDensity === 'compact' ? 'py-1 px-2.5' : 'py-2 px-3'}`}>
+                          <div className="flex items-center gap-1.5 font-semibold text-ink-text text-[12.5px]">
                             <MapPin className="w-3.5 h-3.5 text-brass flex-shrink-0" />
-                            <span>{entry.district || '—'}</span>
+                            <span className="truncate">{entry.district || '—'}</span>
                           </div>
                         </td>
 
                         {/* Petition No. */}
-                        <td className={tableDensity === 'compact' ? 'py-1.5 px-3' : 'py-3.5 px-4'}>
+                        <td className={`align-middle ${tableDensity === 'compact' ? 'py-1 px-2.5' : 'py-2 px-3'}`}>
                           <div className="flex flex-col items-start gap-1">
                             <span
-                              className="inline-flex items-center gap-1.5 font-mono text-[12px] font-bold text-[#000E89] bg-[#E8EEF9] border border-[#CBD8EF] px-2.5 py-1 rounded-md shadow-xs whitespace-nowrap"
+                              className="inline-flex items-center gap-1.5 font-mono text-[11.5px] font-bold text-[#000E89] bg-[#E8EEF9] border border-[#CBD8EF] px-2 py-0.5 rounded shadow-xs whitespace-nowrap"
                               title={entry.petitionNo}
                             >
                               <FileText className="w-3.5 h-3.5 text-[#000E89]/70 flex-shrink-0" />
                               {entry.petitionNo}
                             </span>
                             {entry.type && (
-                              <span className={`inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded border ${
+                              <span className={`inline-flex items-center text-[9.5px] font-semibold px-1.5 py-0.2 rounded border ${
                                 (entry.type || '').toLowerCase().includes('suo')
                                     ? 'bg-purple-50 text-purple-700 border-purple-200'
                                     : 'bg-slate-50 text-slate-600 border-slate-200'
@@ -1207,77 +1207,83 @@ export default function RegisterList() {
                         </td>
 
                         {/* Petitioner */}
-                        <td className={`max-w-[200px] ${tableDensity === 'compact' ? 'py-1.5 px-3' : 'py-3.5 px-4'}`}>
-                          <div className="font-semibold text-ink-text text-[13px] leading-snug line-clamp-2" title={entry.petitionerName}>
+                        <td className={`max-w-[180px] align-middle ${tableDensity === 'compact' ? 'py-1 px-2.5' : 'py-2 px-3'}`}>
+                          <div className="font-semibold text-ink-text text-[12.5px] leading-snug line-clamp-2 break-words" title={entry.petitionerName}>
                             {entry.petitionerName}
                           </div>
                           {entry.petitionerAddress && (
-                            <div className="text-[11px] text-ink-text-faint truncate mt-0.5" title={entry.petitionerAddress}>
+                            <div className="text-[10.5px] text-ink-text-faint truncate mt-0.5" title={entry.petitionerAddress}>
                               {entry.petitionerAddress}
                             </div>
                           )}
                         </td>
 
-                        {/* Respondents (clean professional sub-rows, collapsed to 3 if >3) */}
-                        <td className="p-0 align-top">
+                        {/* Respondents (compact, text-wrapped, cleanly fitted) */}
+                        <td className="p-0 align-top w-[240px] max-w-[280px]">
                           <div className="divide-y divide-[#E2D9C2]">
                             {visibleRespondents.length > 0 ? (
                               visibleRespondents.map((r, i) => (
                                 <div
                                   key={r.id || i}
-                                  className={`${tableDensity === 'compact' ? 'min-h-[38px] px-3 py-1 text-[12px]' : 'min-h-[46px] px-4 py-2 text-[12.5px]'} flex items-center gap-2 leading-tight`}
+                                  className={`${
+                                    tableDensity === 'compact'
+                                      ? 'min-h-[30px] px-2.5 py-1 text-[11.5px]'
+                                      : 'min-h-[34px] px-3 py-1.5 text-[12px]'
+                                  } flex items-start gap-1.5 leading-snug`}
                                   title={`${r.name}${r.designation ? ` (${r.designation})` : ''}${r.department ? ` · ${r.department}` : ''}`}
                                 >
-                                  <span className="w-5 h-5 rounded-full bg-[#EAE4D2] text-[#4A3E25] text-[10px] font-bold flex items-center justify-center flex-shrink-0 shadow-2xs border border-[#DDD5BE]">
+                                  <span className="w-4 h-4 rounded-full bg-[#EAE4D2] text-[#4A3E25] text-[9.5px] font-bold flex items-center justify-center flex-shrink-0 shadow-2xs border border-[#DDD5BE] mt-0.5">
                                     {i + 1}
                                   </span>
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setOfficerFilter(r.name);
-                                      setOfficerRoleFilter('respondent');
-                                    }}
-                                    className="font-semibold text-ink-text hover:text-[#000E89] hover:underline truncate cursor-pointer text-left"
-                                    title={`Click to filter cases by respondent: ${r.name}`}
-                                  >
-                                    {r.name}
-                                  </button>
-                                  {r.designation && (
-                                    <span className="text-[11.5px] text-ink-text-soft truncate font-normal">
-                                      · {r.designation}
-                                    </span>
-                                  )}
+                                  <div className="flex-1 min-w-0 text-left">
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setOfficerFilter(r.name);
+                                        setOfficerRoleFilter('respondent');
+                                      }}
+                                      className="font-semibold text-ink-text hover:text-[#000E89] hover:underline cursor-pointer text-left break-words inline"
+                                      title={`Click to filter cases by respondent: ${r.name}`}
+                                    >
+                                      {r.name}
+                                    </button>
+                                    {r.designation && (
+                                      <span className="text-[11px] text-ink-text-soft font-normal ml-1 inline break-words">
+                                        • {r.designation}
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
                               ))
                             ) : (
-                              <div className={`${tableDensity === 'compact' ? 'min-h-[38px]' : 'min-h-[46px]'} px-4 py-2 flex items-center text-[12px] text-ink-text-faint italic font-mono`}>
+                              <div className={`${tableDensity === 'compact' ? 'min-h-[30px]' : 'min-h-[34px]'} px-3 py-1.5 flex items-center text-[11.5px] text-ink-text-faint italic font-mono`}>
                                 —
                               </div>
                             )}
                           </div>
                           {hasMoreRespondents && (
-                            <div className="p-1.5 bg-[#FAF6EC]/90 border-t border-[#E2D9C2] flex items-center justify-center">
+                            <div className="h-[28px] bg-[#FAF6EC]/90 border-t border-[#E2D9C2] flex items-center justify-center">
                               <button
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   toggleExpandCase(entry.id);
                                 }}
-                                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold text-[#000E89] hover:bg-[#000E89] hover:text-white transition-all shadow-xs border border-[#CBD8EF] bg-white group/exp cursor-pointer"
+                                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold text-[#000E89] hover:bg-[#000E89] hover:text-white transition-all shadow-xs border border-[#CBD8EF] bg-white group/exp cursor-pointer"
                               >
                                 {isExpanded ? (
                                   <>
-                                    <ChevronUp className="w-3.5 h-3.5 text-[#000E89] group-hover/exp:text-white transition-transform" />
+                                    <ChevronUp className="w-3 h-3 text-[#000E89] group-hover/exp:text-white transition-transform" />
                                     <span>Show less</span>
                                   </>
                                 ) : (
                                   <>
-                                    <span className="w-4 h-4 rounded-full bg-[#000E89]/10 group-hover/exp:bg-white/20 text-[#000E89] group-hover/exp:text-white flex items-center justify-center text-[10px] font-bold">
+                                    <span className="w-3.5 h-3.5 rounded-full bg-[#000E89]/10 group-hover/exp:bg-white/20 text-[#000E89] group-hover/exp:text-white flex items-center justify-center text-[9px] font-bold">
                                       +{respondents.length - 3}
                                     </span>
                                     <span>more</span>
-                                    <ChevronDown className="w-3.5 h-3.5 text-[#000E89] group-hover/exp:text-white transition-transform" />
+                                    <ChevronDown className="w-3 h-3 text-[#000E89] group-hover/exp:text-white transition-transform" />
                                   </>
                                 )}
                               </button>
@@ -1285,23 +1291,32 @@ export default function RegisterList() {
                           )}
                         </td>
 
-                        {/* Proposal (aligned per respondent with divider lines) */}
-                        <td className="p-0 align-top">
+                        {/* Proposal (aligned per respondent with divider lines, centered) */}
+                        <td className="p-0 align-top w-[95px]">
                           <div className="divide-y divide-[#E2D9C2]">
                             {visibleRespondents.length > 0 ? (
                               visibleRespondents.map((r, i) => (
-                                <div key={r.id || i} className={`${tableDensity === 'compact' ? 'min-h-[38px] px-3 py-1' : 'min-h-[46px] px-4 py-2'} flex items-center`}>
+                                <div
+                                  key={r.id || i}
+                                  className={`${
+                                    tableDensity === 'compact' ? 'min-h-[30px] px-2 py-1' : 'min-h-[34px] px-2.5 py-1.5'
+                                  } flex items-center justify-center`}
+                                >
                                   {renderProposalBadge(entry.proposalStatus)}
                                 </div>
                               ))
                             ) : (
-                              <div className={`${tableDensity === 'compact' ? 'min-h-[38px] px-3 py-1' : 'min-h-[46px] px-4 py-2'} flex items-center`}>
+                              <div
+                                className={`${
+                                  tableDensity === 'compact' ? 'min-h-[30px] px-2 py-1' : 'min-h-[34px] px-2.5 py-1.5'
+                                } flex items-center justify-center`}
+                              >
                                 {renderProposalBadge(entry.proposalStatus)}
                               </div>
                             )}
                           </div>
                           {hasMoreRespondents && (
-                            <div className="h-[37px] bg-[#FAF6EC]/40 border-t border-[#E2D9C2] flex items-center justify-center">
+                            <div className="h-[28px] bg-[#FAF6EC]/40 border-t border-[#E2D9C2] flex items-center justify-center">
                               <span className="text-[10px] text-ink-text-faint/60 font-mono italic">
                                 {isExpanded ? '—' : `+${respondents.length - 3}`}
                               </span>
@@ -1309,23 +1324,32 @@ export default function RegisterList() {
                           )}
                         </td>
 
-                        {/* Permission (aligned per respondent with divider lines) */}
-                        <td className="p-0 align-top">
+                        {/* Permission (aligned per respondent with divider lines, centered) */}
+                        <td className="p-0 align-top w-[105px]">
                           <div className="divide-y divide-[#E2D9C2]">
                             {visibleRespondents.length > 0 ? (
                               visibleRespondents.map((r, i) => (
-                                <div key={r.id || i} className={`${tableDensity === 'compact' ? 'min-h-[38px] px-3 py-1' : 'min-h-[46px] px-4 py-2'} flex items-center`}>
+                                <div
+                                  key={r.id || i}
+                                  className={`${
+                                    tableDensity === 'compact' ? 'min-h-[30px] px-2 py-1' : 'min-h-[34px] px-2.5 py-1.5'
+                                  } flex items-center justify-center`}
+                                >
                                   {renderPermissionBadge(r.permissionStatus)}
                                 </div>
                               ))
                             ) : (
-                              <div className={`${tableDensity === 'compact' ? 'min-h-[38px] px-3 py-1' : 'min-h-[46px] px-4 py-2'} flex items-center text-[12px] text-ink-text-faint italic font-mono`}>
+                              <div
+                                className={`${
+                                  tableDensity === 'compact' ? 'min-h-[30px] px-2 py-1' : 'min-h-[34px] px-2.5 py-1.5'
+                                } flex items-center justify-center text-[11.5px] text-ink-text-faint italic font-mono`}
+                              >
                                 —
                               </div>
                             )}
                           </div>
                           {hasMoreRespondents && (
-                            <div className="h-[37px] bg-[#FAF6EC]/40 border-t border-[#E2D9C2] flex items-center justify-center">
+                            <div className="h-[28px] bg-[#FAF6EC]/40 border-t border-[#E2D9C2] flex items-center justify-center">
                               <span className="text-[10px] text-ink-text-faint/60 font-mono italic">
                                 {isExpanded ? '—' : `+${respondents.length - 3}`}
                               </span>
@@ -1334,14 +1358,14 @@ export default function RegisterList() {
                         </td>
 
                         {/* PE No. & Date - displayed ONCE per petition */}
-                        <td className={`align-middle text-center ${tableDensity === 'compact' ? 'px-2 py-1.5' : 'px-3.5 py-3'}`}>
+                        <td className={`align-middle text-center ${tableDensity === 'compact' ? 'px-2 py-1' : 'px-2.5 py-2'}`}>
                           <div className="flex flex-col items-center justify-center gap-1">
                             {entry.peNo ? (
-                              <span className="font-mono text-[11px] font-bold text-[#000E89] bg-[#E8EEF9] border border-[#CBD8EF] px-2 py-0.5 rounded shadow-2xs whitespace-nowrap">
+                              <span className="font-mono text-[10.5px] font-bold text-[#000E89] bg-[#E8EEF9] border border-[#CBD8EF] px-2 py-0.5 rounded shadow-2xs whitespace-nowrap">
                                 PE #{entry.peNo}
                               </span>
                             ) : (
-                              <span className="text-[12px] text-ink-text-faint/60 italic font-mono">—</span>
+                              <span className="text-[11.5px] text-ink-text-faint/60 italic font-mono">—</span>
                             )}
                             {entry.peRegDate && (
                               <span className="text-[10px] text-ink-text-soft flex items-center gap-1 font-mono whitespace-nowrap">
@@ -1353,7 +1377,7 @@ export default function RegisterList() {
                         </td>
 
                         {/* PE Status - displayed ONCE per petition */}
-                        <td className={`align-middle text-center ${tableDensity === 'compact' ? 'px-2 py-1.5' : 'px-3.5 py-3'}`}>
+                        <td className={`align-middle text-center ${tableDensity === 'compact' ? 'px-2 py-1' : 'px-2.5 py-2'}`}>
                           <div className="flex items-center justify-center">
                             {renderPeStatusBadge(entry.peStatus)}
                           </div>
