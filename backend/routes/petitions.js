@@ -17,7 +17,7 @@ const getIncludeOpts = () => ({
   createdBy: { select: { id: true, supervisorUserId: true } }
 });
 
-// Get all petitions — server-side pagination + search for 1200-officer scale
+// Get all petitions — server-side pagination + rich filters + search
 router.get('/', async (req, res) => {
   try {
     const isAll = req.query.all === 'true';
@@ -26,6 +26,16 @@ router.get('/', async (req, res) => {
     const search = (req.query.search || '').trim();
     const districtFilter = req.query.district || '';
     const statusFilter = req.query.status || '';
+    const proposalStatusFilter = req.query.proposalStatus || '';
+    const permissionStatusFilter = req.query.permissionStatus || '';
+    const typeFilter = req.query.type || '';
+    const sortBy = req.query.sortBy || 'createdAt';
+    const sortOrder = req.query.sortOrder === 'asc' ? 'asc' : 'desc';
+    const dateFrom = req.query.dateFrom || '';
+    const dateTo = req.query.dateTo || '';
+    const dateField = req.query.dateField || 'createdAt';
+    const officerFilter = (req.query.officer || '').trim();
+    const officerRole = (req.query.officerRole || 'all').trim();
 
     let allowedCreatorIds = null;
     if (req.user.role !== 'admin') {
@@ -39,8 +49,57 @@ router.get('/', async (req, res) => {
     const where = {
       ...(allowedCreatorIds ? { createdById: { in: allowedCreatorIds } } : {}),
       ...(districtFilter ? { district: districtFilter } : {}),
-      ...(statusFilter ? { peStatus: statusFilter } : {}),
-      ...(search ? {
+      ...(statusFilter ? { peStatus: { equals: statusFilter, mode: 'insensitive' } } : {}),
+      ...(proposalStatusFilter ? { proposalStatus: { equals: proposalStatusFilter, mode: 'insensitive' } } : {}),
+      ...(typeFilter ? { type: { equals: typeFilter, mode: 'insensitive' } } : {}),
+      ...(permissionStatusFilter ? {
+        respondents: {
+          some: {
+            permissionStatus: {
+              contains: permissionStatusFilter,
+              mode: 'insensitive'
+            }
+          }
+        }
+      } : {}),
+      ...(dateFrom || dateTo ? {
+        [dateField]: {
+          ...(dateFrom ? { gte: new Date(dateFrom) } : {}),
+          ...(dateTo ? { lte: new Date(new Date(dateTo).setHours(23, 59, 59, 999)) } : {})
+        }
+      } : {})
+    };
+
+    const andConditions = [];
+    if (officerFilter) {
+      if (officerRole === 'investigating') {
+        andConditions.push({
+          OR: [
+            { sirOfficerName: { contains: officerFilter, mode: 'insensitive' } },
+            { sirEo: { contains: officerFilter, mode: 'insensitive' } }
+          ]
+        });
+      } else if (officerRole === 'respondent') {
+        andConditions.push({
+          respondents: {
+            some: {
+              name: { contains: officerFilter, mode: 'insensitive' }
+            }
+          }
+        });
+      } else {
+        andConditions.push({
+          OR: [
+            { sirOfficerName: { contains: officerFilter, mode: 'insensitive' } },
+            { sirEo: { contains: officerFilter, mode: 'insensitive' } },
+            { respondents: { some: { name: { contains: officerFilter, mode: 'insensitive' } } } }
+          ]
+        });
+      }
+    }
+
+    if (search) {
+      andConditions.push({
         OR: [
           { petitionNo: { contains: search, mode: 'insensitive' } },
           { peNo: { contains: search, mode: 'insensitive' } },
@@ -50,28 +109,49 @@ router.get('/', async (req, res) => {
           { officerRank: { contains: search, mode: 'insensitive' } },
           { respondents: { some: { name: { contains: search, mode: 'insensitive' } } } }
         ]
-      } : {})
-    };
+      });
+    }
 
-    // Try cache only for admin with no filters (most expensive query)
-    const isUnfiltered = req.user.role === 'admin' && !search && !districtFilter && !statusFilter && page === 1 && !isAll;
+    if (andConditions.length > 0) {
+      where.AND = andConditions;
+    }
+
+    let orderBy = { createdAt: 'desc' };
+    if (sortBy === 'petitionNo') orderBy = { petitionNo: sortOrder };
+    else if (sortBy === 'peNo') orderBy = { peNo: sortOrder };
+    else if (sortBy === 'district') orderBy = { district: sortOrder };
+    else if (sortBy === 'peRegDate') orderBy = { peRegDate: sortOrder };
+    else if (sortBy === 'proposalSentDate') orderBy = { proposalSentDate: sortOrder };
+    else if (sortBy === 'createdAt') orderBy = { createdAt: sortOrder };
+
+    // Try cache only for admin with no filters
+    const isUnfiltered = req.user.role === 'admin' && !search && !districtFilter && !statusFilter &&
+      !proposalStatusFilter && !permissionStatusFilter && !typeFilter && !dateFrom && !dateTo &&
+      !officerFilter && sortBy === 'createdAt' && sortOrder === 'desc' && page === 1 && !isAll;
+
     const cacheKey = `petitions:p${page}:ps${pageSize}`;
     if (isUnfiltered) {
       const cached = await redisClient.get(cacheKey);
       if (cached) return res.json(JSON.parse(cached));
     }
 
-    const [petitions, total] = await Promise.all([
+    const baseWhere = allowedCreatorIds ? { createdById: { in: allowedCreatorIds } } : {};
+
+    const [petitions, total, pePendingCount, firCount, deCount, closeCount] = await Promise.all([
       prisma.petition.findMany({
         where,
         include: getIncludeOpts(),
-        orderBy: { createdAt: 'desc' },
+        orderBy,
         ...(isAll ? {} : {
           skip: (page - 1) * pageSize,
           take: pageSize
         })
       }),
-      prisma.petition.count({ where })
+      prisma.petition.count({ where }),
+      prisma.petition.count({ where: { ...baseWhere, peStatus: { contains: 'pending', mode: 'insensitive' } } }),
+      prisma.petition.count({ where: { ...baseWhere, peStatus: { contains: 'fir', mode: 'insensitive' } } }),
+      prisma.petition.count({ where: { ...baseWhere, peStatus: { contains: 'de', mode: 'insensitive' } } }),
+      prisma.petition.count({ where: { ...baseWhere, peStatus: { contains: 'close', mode: 'insensitive' } } })
     ]);
 
     const result = {
@@ -79,7 +159,14 @@ router.get('/', async (req, res) => {
       total,
       page: isAll ? 1 : page,
       pageSize: isAll ? total : pageSize,
-      totalPages: isAll ? 1 : Math.ceil(total / (pageSize || 25))
+      totalPages: isAll ? 1 : Math.ceil(total / (pageSize || 25)),
+      counts: {
+        total,
+        pePending: pePendingCount,
+        fir: firCount,
+        de: deCount,
+        close: closeCount
+      }
     };
 
     if (isUnfiltered) {
@@ -90,6 +177,73 @@ router.get('/', async (req, res) => {
   } catch (error) {
     console.error('Fetch petitions error:', error);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Distinct officers for filter autocomplete & select
+router.get('/meta/officers', async (req, res) => {
+  try {
+    const [sirOfficers, respondents, registeredOfficers] = await Promise.all([
+      prisma.petition.findMany({
+        where: { sirOfficerName: { not: null } },
+        select: { sirOfficerName: true, officerRank: true },
+        distinct: ['sirOfficerName']
+      }),
+      prisma.respondent.findMany({
+        where: { name: { not: '' } },
+        select: { name: true, designation: true, department: true },
+        distinct: ['name']
+      }),
+      prisma.officer.findMany({
+        where: { isActive: true },
+        select: { name: true, designation: true },
+        orderBy: { name: 'asc' }
+      })
+    ]);
+
+    const officersMap = new Map();
+
+    // 1. Registered Police / Investigating Officers
+    registeredOfficers.forEach(o => {
+      const name = (o.name || '').trim();
+      if (name && !officersMap.has(name.toLowerCase())) {
+        officersMap.set(name.toLowerCase(), {
+          name,
+          role: 'Investigating Officer / Police',
+          designation: o.designation || 'Officer'
+        });
+      }
+    });
+
+    // 2. SIR Officers from petitions
+    sirOfficers.forEach(p => {
+      const name = (p.sirOfficerName || '').trim();
+      if (name && !officersMap.has(name.toLowerCase())) {
+        officersMap.set(name.toLowerCase(), {
+          name,
+          role: 'SIR Investigating Officer',
+          designation: p.officerRank || 'SIR Officer'
+        });
+      }
+    });
+
+    // 3. Respondents / Accused Officers
+    respondents.forEach(r => {
+      const name = (r.name || '').trim();
+      if (name && !officersMap.has(name.toLowerCase())) {
+        officersMap.set(name.toLowerCase(), {
+          name,
+          role: 'Accused / Respondent Officer',
+          designation: r.designation || r.department || 'Respondent'
+        });
+      }
+    });
+
+    const officers = Array.from(officersMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+    res.json(officers);
+  } catch (err) {
+    console.error('Fetch officers meta error:', err);
+    res.status(500).json({ error: 'Failed to fetch officers metadata' });
   }
 });
 

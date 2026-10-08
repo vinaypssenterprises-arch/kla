@@ -6,7 +6,7 @@ import {
   FileText, Calendar, Users, MessageSquare, MapPin, CheckCircle2,
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronDown, ChevronUp,
   AlertCircle, Clock, Gavel, Shield, Building2, SlidersHorizontal, FileDown,
-  Settings2
+  Settings2, ArrowUpDown, Filter, RotateCcw, Maximize2, Minimize2, Check, Sparkles
 } from 'lucide-react';
 import { exportPetitionsToExcel } from '../lib/exportExcel';
 import { exportPetitionToPdf } from '../lib/exportPdf';
@@ -42,11 +42,70 @@ export default function RegisterList() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [districtFilter, setDistrictFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [proposalFilter, setProposalFilter] = useState('');
+  const [permissionFilter, setPermissionFilter] = useState('');
+  const [typeFilter, setTypeFilter] = useState('');
+  const [sortBy, setSortBy] = useState('createdAt');
+  const [sortOrder, setSortOrder] = useState('desc');
+  const [dateField, setDateField] = useState('createdAt');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [officerFilter, setOfficerFilter] = useState('');
+  const [officerRoleFilter, setOfficerRoleFilter] = useState('all'); // 'all' | 'investigating' | 'respondent'
+  const [availableOfficers, setAvailableOfficers] = useState([]);
+  const [isAdvancedFiltersOpen, setIsAdvancedFiltersOpen] = useState(false);
+  const [statusCounts, setStatusCounts] = useState({ total: 0, pePending: 0, fir: 0, de: 0, close: 0 });
+  const [tableDensity, setTableDensity] = useState('comfortable'); // 'comfortable' | 'compact'
+  const [allExpanded, setAllExpanded] = useState(false);
   const [allDistricts, setAllDistricts] = useState([]);
 
   const currentUserId = localStorage.getItem('userId');
   const role = localStorage.getItem('role');
   const searchDebounceRef = useRef(null);
+  const tableContainerRef = useRef(null);
+  const topScrollRef = useRef(null);
+
+  // Synced top scrollbar state
+  const [scrollWidth, setScrollWidth] = useState(1380);
+
+  const updateScrollWidth = useCallback(() => {
+    const el = tableContainerRef.current;
+    if (!el) return;
+    setScrollWidth(el.scrollWidth);
+  }, []);
+
+  useEffect(() => {
+    const runUpdate = () => updateScrollWidth();
+    runUpdate();
+    const t1 = setTimeout(runUpdate, 60);
+    const t2 = setTimeout(runUpdate, 250);
+
+    const el = tableContainerRef.current;
+    if (!el) return () => { clearTimeout(t1); clearTimeout(t2); };
+
+    const handleScroll = () => {
+      if (topScrollRef.current && Math.abs(topScrollRef.current.scrollLeft - el.scrollLeft) > 1) {
+        topScrollRef.current.scrollLeft = el.scrollLeft;
+      }
+    };
+
+    el.addEventListener('scroll', handleScroll, { passive: true });
+    window.addEventListener('resize', runUpdate);
+
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      el.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('resize', runUpdate);
+    };
+  }, [entries, loading, updateScrollWidth]);
+
+  const handleTopScroll = () => {
+    if (!tableContainerRef.current || !topScrollRef.current) return;
+    if (Math.abs(tableContainerRef.current.scrollLeft - topScrollRef.current.scrollLeft) > 1) {
+      tableContainerRef.current.scrollLeft = topScrollRef.current.scrollLeft;
+    }
+  };
 
   // Debounce search input — 350ms delay
   useEffect(() => {
@@ -58,8 +117,10 @@ export default function RegisterList() {
     return () => clearTimeout(searchDebounceRef.current);
   }, [searchQuery]);
 
-  // Reset to page 1 when filters change
-  useEffect(() => { setPage(1); }, [districtFilter, statusFilter]);
+  // Reset to page 1 when any filter changes
+  useEffect(() => {
+    setPage(1);
+  }, [districtFilter, statusFilter, proposalFilter, permissionFilter, typeFilter, sortBy, sortOrder, dateFrom, dateTo, dateField, officerFilter, officerRoleFilter]);
 
   // Fetch districts (one-time)
   useEffect(() => {
@@ -69,6 +130,16 @@ export default function RegisterList() {
       .catch(err => console.error('Districts load error', err));
   }, []);
 
+  // Fetch officers for autocomplete & filter select (one-time)
+  useEffect(() => {
+    apiFetch('/petitions/meta/officers')
+      .then(r => r.json())
+      .then(data => {
+        if (Array.isArray(data)) setAvailableOfficers(data);
+      })
+      .catch(err => console.error('Officers meta load error', err));
+  }, []);
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
@@ -76,6 +147,18 @@ export default function RegisterList() {
       if (debouncedSearch) params.set('search', debouncedSearch);
       if (districtFilter) params.set('district', districtFilter);
       if (statusFilter) params.set('status', statusFilter);
+      if (proposalFilter) params.set('proposalStatus', proposalFilter);
+      if (permissionFilter) params.set('permissionStatus', permissionFilter);
+      if (typeFilter) params.set('type', typeFilter);
+      if (sortBy) params.set('sortBy', sortBy);
+      if (sortOrder) params.set('sortOrder', sortOrder);
+      if (dateFrom) params.set('dateFrom', dateFrom);
+      if (dateTo) params.set('dateTo', dateTo);
+      if (dateField) params.set('dateField', dateField);
+      if (officerFilter) {
+        params.set('officer', officerFilter);
+        if (officerRoleFilter) params.set('officerRole', officerRoleFilter);
+      }
 
       const res = await apiFetch(`/petitions?${params.toString()}`);
       if (res.ok) {
@@ -89,6 +172,9 @@ export default function RegisterList() {
           setEntries(json.data || []);
           setTotal(json.total || 0);
           setTotalPages(json.totalPages || 1);
+          if (json.counts) {
+            setStatusCounts(json.counts);
+          }
         }
       } else {
         showError('Failed to load petitions. Please try again.');
@@ -98,9 +184,55 @@ export default function RegisterList() {
     } finally {
       setLoading(false);
     }
-  }, [page, pageSize, debouncedSearch, districtFilter, statusFilter]);
+  }, [page, pageSize, debouncedSearch, districtFilter, statusFilter, proposalFilter, permissionFilter, typeFilter, sortBy, sortOrder, dateFrom, dateTo, dateField, officerFilter, officerRoleFilter]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  const activeFilters = [
+    debouncedSearch && { id: 'search', label: `Search: "${debouncedSearch}"`, clear: () => { setSearchQuery(''); setDebouncedSearch(''); } },
+    districtFilter && { id: 'district', label: `District: ${districtFilter}`, clear: () => setDistrictFilter('') },
+    statusFilter && { id: 'status', label: `PE: ${statusFilter}`, clear: () => setStatusFilter('') },
+    officerFilter && {
+      id: 'officer',
+      label: `Officer: ${officerFilter} (${officerRoleFilter === 'investigating' ? 'SIR / Investigating' : officerRoleFilter === 'respondent' ? 'Respondent' : 'All Roles'})`,
+      clear: () => { setOfficerFilter(''); setOfficerRoleFilter('all'); }
+    },
+    proposalFilter && { id: 'proposal', label: `Proposal: ${proposalFilter}`, clear: () => setProposalFilter('') },
+    permissionFilter && { id: 'permission', label: `Permission: ${permissionFilter === 'Obtain' ? 'Obtained' : permissionFilter}`, clear: () => setPermissionFilter('') },
+    typeFilter && { id: 'type', label: `Type: ${typeFilter}`, clear: () => setTypeFilter('') },
+    (dateFrom || dateTo) && { id: 'date', label: `Date: ${dateFrom || 'Any'} → ${dateTo || 'Any'}`, clear: () => { setDateFrom(''); setDateTo(''); } },
+    (sortBy !== 'createdAt' || sortOrder !== 'desc') && { id: 'sort', label: `Sort: ${sortBy} (${sortOrder === 'asc' ? 'Asc ↑' : 'Desc ↓'})`, clear: () => { setSortBy('createdAt'); setSortOrder('desc'); } }
+  ].filter(Boolean);
+
+  const clearAllFilters = () => {
+    setSearchQuery('');
+    setDebouncedSearch('');
+    setDistrictFilter('');
+    setStatusFilter('');
+    setOfficerFilter('');
+    setOfficerRoleFilter('all');
+    setProposalFilter('');
+    setPermissionFilter('');
+    setTypeFilter('');
+    setDateFrom('');
+    setDateTo('');
+    setSortBy('createdAt');
+    setSortOrder('desc');
+  };
+
+  const toggleExpandAll = () => {
+    setAllExpanded(prev => {
+      const next = !prev;
+      const updated = {};
+      entries.forEach(e => {
+        if ((e.respondents || []).length > 3) {
+          updated[e.id] = next;
+        }
+      });
+      setExpandedCases(updated);
+      return next;
+    });
+  };
 
   const formatDate = (d) => d
     ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
@@ -154,7 +286,17 @@ export default function RegisterList() {
       await exportPetitionsToExcel({
         search: debouncedSearch,
         district: districtFilter,
-        status: statusFilter
+        status: statusFilter,
+        proposalStatus: proposalFilter,
+        permissionStatus: permissionFilter,
+        type: typeFilter,
+        sortBy,
+        sortOrder,
+        dateFrom,
+        dateTo,
+        dateField,
+        officer: officerFilter,
+        officerRole: officerRoleFilter
       });
       showSuccess('Petitions exported to Excel successfully.');
     } catch (err) {
@@ -255,23 +397,63 @@ export default function RegisterList() {
       <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
         <div>
           <h2 className="text-[22px] font-serif font-bold text-ink-text tracking-tight">17-A Proposals & Status Register</h2>
-          <p className="text-[13.5px] text-ink-text-soft mt-0.5">
-            Petitions, sanction proposals under Sec. 17-A, and Preliminary Enquiry tracker
+          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[12px] font-bold bg-[#EAE4D2] text-[#4A3E25] border border-[#D5CCA8]/80 shadow-2xs">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#A97B33]" />
+              {total.toLocaleString()} {total === 1 ? 'total record' : 'total records'}
+            </span>
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[12px] font-bold bg-[#000E89]/10 text-[#000E89] border border-[#CBD8EF] font-mono shadow-2xs">
+              Page {page} of {Math.max(1, totalPages)}
+            </span>
             {total > 0 && (
-              <span className="ml-2.5 px-2 py-0.5 rounded-full text-[11.5px] font-bold bg-[#EAE4D2] text-[#4A3E25]">
-                {total.toLocaleString()} total records
+              <span className="text-[12px] text-ink-text-soft font-medium">
+                • Showing {startEntry}–{endEntry}
               </span>
             )}
-          </p>
+            {activeFilters.length > 0 && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs">
+                Filtered view ({activeFilters.length})
+              </span>
+            )}
+          </div>
         </div>
-        <button type="button" className="btn btn-excel no-print shadow-sm" title="Export to Excel" onClick={handleExportExcel}>
-          <Download className="w-[15px] h-[15px]" />
-          Export Excel
-        </button>
+
+        <div className="flex items-center gap-2.5 flex-wrap">
+          {totalPages > 1 && (
+            <div className="hidden sm:inline-flex items-center gap-1 bg-[#FFFDF7] border border-[#D5CCA8] px-2 py-1 rounded-lg shadow-2xs">
+              <button
+                type="button"
+                onClick={() => goToPage(page - 1)}
+                disabled={page === 1}
+                className="w-6 h-6 flex items-center justify-center rounded hover:bg-[#EAE4D2] text-ink-text disabled:opacity-30 transition-colors"
+                title="Previous page"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+              </button>
+              <span className="text-[12px] font-mono font-bold text-[#000E89] px-1.5">
+                Page {page} / {totalPages}
+              </span>
+              <button
+                type="button"
+                onClick={() => goToPage(page + 1)}
+                disabled={page === totalPages}
+                className="w-6 h-6 flex items-center justify-center rounded hover:bg-[#EAE4D2] text-ink-text disabled:opacity-30 transition-colors"
+                title="Next page"
+              >
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
+          <button type="button" className="btn btn-excel no-print shadow-sm" title="Export to Excel" onClick={handleExportExcel}>
+            <Download className="w-[15px] h-[15px]" />
+            Export Excel
+          </button>
+        </div>
       </div>
 
       {/* Filter Bar */}
-      <section className="flex flex-col md:flex-row gap-3 mb-[22px] items-stretch md:items-center flex-wrap">
+      <section className="flex flex-col md:flex-row gap-2.5 mb-3 items-stretch md:items-center flex-wrap">
         <div className="relative flex-1 min-w-[240px]">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-text-faint pointer-events-none" />
           <input
@@ -292,6 +474,7 @@ export default function RegisterList() {
             </button>
           )}
         </div>
+
         <SearchableSelect
           className="w-auto min-w-[170px]"
           value={districtFilter}
@@ -299,6 +482,7 @@ export default function RegisterList() {
           options={[{ value: '', label: 'All Districts' }, ...activeDistricts.map(d => ({ value: d, label: d }))]}
           label="Filter by District"
         />
+
         <select
           className="app-input w-auto min-w-[150px]"
           aria-label="Filter by PE status"
@@ -311,36 +495,515 @@ export default function RegisterList() {
           <option value="Recommended to DE">Recommended to DE</option>
           <option value="Close">Close</option>
         </select>
-        {(searchQuery || districtFilter || statusFilter) && (
+
+        <SearchableSelect
+          className="w-auto min-w-[190px]"
+          value={officerFilter}
+          onChange={v => setOfficerFilter(v)}
+          options={[
+            { value: '', label: 'All Officers' },
+            ...availableOfficers.map(o => ({
+              value: o.name,
+              label: `${o.name} (${o.designation || o.role})`
+            }))
+          ]}
+          label="Filter by Officer"
+          placeholder="All Officers"
+          searchPlaceholder="Search officer name or designation…"
+        />
+
+        {/* Advanced Filters Toggle Button */}
+        <button
+          type="button"
+          onClick={() => setIsAdvancedFiltersOpen(prev => !prev)}
+          className={`btn ${
+            isAdvancedFiltersOpen || activeFilters.length > (debouncedSearch || districtFilter || statusFilter ? 1 : 0)
+              ? 'bg-[#000E89] text-white border-[#000E89] shadow-xs'
+              : 'btn-secondary'
+          } py-2 px-3 text-[12.5px] flex items-center gap-1.5`}
+          title="Toggle advanced filters"
+        >
+          <SlidersHorizontal className="w-3.5 h-3.5" />
+          <span>Filters</span>
+          {activeFilters.length > 0 && (
+            <span className="w-5 h-5 rounded-full bg-amber-400 text-[#000E89] font-bold text-[11px] flex items-center justify-center">
+              {activeFilters.length}
+            </span>
+          )}
+        </button>
+
+        {/* Density Toggle Button */}
+        <button
+          type="button"
+          onClick={() => setTableDensity(d => d === 'comfortable' ? 'compact' : 'comfortable')}
+          className="btn btn-secondary py-2 px-3 text-[12.5px] hidden sm:inline-flex items-center gap-1.5"
+          title={tableDensity === 'comfortable' ? 'Switch to compact view' : 'Switch to comfortable view'}
+        >
+          {tableDensity === 'comfortable' ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+          <span>{tableDensity === 'comfortable' ? 'Compact' : 'Spacious'}</span>
+        </button>
+
+        {/* Expand / Collapse All Respondents Button */}
+        <button
+          type="button"
+          onClick={toggleExpandAll}
+          className="btn btn-secondary py-2 px-3 text-[12.5px] hidden md:inline-flex items-center gap-1.5"
+          title={allExpanded ? 'Collapse all respondents' : 'Expand all respondents'}
+        >
+          <Users className="w-3.5 h-3.5 text-brass" />
+          <span>{allExpanded ? 'Collapse All' : 'Expand All'}</span>
+        </button>
+
+        {activeFilters.length > 0 && (
           <button
             type="button"
             className="btn btn-secondary py-2 px-3 text-[12.5px]"
-            onClick={() => { setSearchQuery(''); setDebouncedSearch(''); setDistrictFilter(''); setStatusFilter(''); }}
+            onClick={clearAllFilters}
             title="Reset all filters"
           >
             <X className="w-3.5 h-3.5" />
             Clear Filters
           </button>
         )}
+
         <button type="button" className="btn btn-primary md:ml-auto" onClick={() => navigate('/register/new')}>
           <Plus className="w-[18px] h-[18px]" strokeWidth={2.3} />
           Add Petition
         </button>
       </section>
 
+      {/* Quick Status Chips */}
+      <div className="flex items-center gap-1.5 mb-3 overflow-x-auto pb-1 scrollbar-none text-[12px]">
+        <span className="text-[11px] font-bold uppercase tracking-wider text-ink-text-soft/80 flex items-center gap-1 flex-shrink-0 mr-1">
+          <Sparkles className="w-3.5 h-3.5 text-brass" />
+          Quick:
+        </span>
+
+        {/* All Chip */}
+        <button
+          type="button"
+          onClick={() => { setStatusFilter(''); setProposalFilter(''); setPermissionFilter(''); }}
+          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full font-medium transition-all flex-shrink-0 cursor-pointer ${
+            !statusFilter && !proposalFilter && !permissionFilter
+              ? 'bg-[#000E89] text-white shadow-xs font-semibold'
+              : 'bg-white/80 hover:bg-[#EAE4D2] text-ink-text border border-[#D5CCA8]'
+          }`}
+        >
+          All Petitions
+          <span className={`text-[10.5px] px-1.5 py-0.2 rounded-full font-bold ${
+            !statusFilter && !proposalFilter && !permissionFilter ? 'bg-white/20 text-white' : 'bg-[#EAE4D2] text-[#4A3E25]'
+          }`}>
+            {total}
+          </span>
+        </button>
+
+        {/* PE Pending */}
+        <button
+          type="button"
+          onClick={() => setStatusFilter(statusFilter === 'PE Pending' ? '' : 'PE Pending')}
+          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full font-medium transition-all flex-shrink-0 cursor-pointer ${
+            statusFilter === 'PE Pending'
+              ? 'bg-amber-700 text-white shadow-xs font-semibold'
+              : 'bg-white/80 hover:bg-amber-50 text-amber-900 border border-amber-200'
+          }`}
+        >
+          <Clock className="w-3 h-3" />
+          PE Pending
+          {statusCounts.pePending > 0 && (
+            <span className="text-[10.5px] px-1.5 py-0.2 rounded-full font-bold bg-amber-100 text-amber-900">
+              {statusCounts.pePending}
+            </span>
+          )}
+        </button>
+
+        {/* Register FIR */}
+        <button
+          type="button"
+          onClick={() => setStatusFilter(statusFilter === 'Register FIR' ? '' : 'Register FIR')}
+          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full font-medium transition-all flex-shrink-0 cursor-pointer ${
+            statusFilter === 'Register FIR'
+              ? 'bg-rose-700 text-white shadow-xs font-semibold'
+              : 'bg-white/80 hover:bg-rose-50 text-rose-900 border border-rose-200'
+          }`}
+        >
+          <AlertCircle className="w-3 h-3" />
+          Register FIR
+          {statusCounts.fir > 0 && (
+            <span className="text-[10.5px] px-1.5 py-0.2 rounded-full font-bold bg-rose-100 text-rose-900">
+              {statusCounts.fir}
+            </span>
+          )}
+        </button>
+
+        {/* Recommended to DE */}
+        <button
+          type="button"
+          onClick={() => setStatusFilter(statusFilter === 'Recommended to DE' ? '' : 'Recommended to DE')}
+          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full font-medium transition-all flex-shrink-0 cursor-pointer ${
+            statusFilter === 'Recommended to DE'
+              ? 'bg-blue-700 text-white shadow-xs font-semibold'
+              : 'bg-white/80 hover:bg-blue-50 text-blue-900 border border-blue-200'
+          }`}
+        >
+          <Shield className="w-3 h-3" />
+          Recommended to DE
+          {statusCounts.de > 0 && (
+            <span className="text-[10.5px] px-1.5 py-0.2 rounded-full font-bold bg-blue-100 text-blue-900">
+              {statusCounts.de}
+            </span>
+          )}
+        </button>
+
+        {/* Close */}
+        <button
+          type="button"
+          onClick={() => setStatusFilter(statusFilter === 'Close' ? '' : 'Close')}
+          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full font-medium transition-all flex-shrink-0 cursor-pointer ${
+            statusFilter === 'Close'
+              ? 'bg-slate-700 text-white shadow-xs font-semibold'
+              : 'bg-white/80 hover:bg-slate-100 text-slate-800 border border-slate-200'
+          }`}
+        >
+          <CheckCircle2 className="w-3 h-3" />
+          PE Closed
+          {statusCounts.close > 0 && (
+            <span className="text-[10.5px] px-1.5 py-0.2 rounded-full font-bold bg-slate-200 text-slate-800">
+              {statusCounts.close}
+            </span>
+          )}
+        </button>
+
+        {/* Permission Obtained */}
+        <button
+          type="button"
+          onClick={() => setPermissionFilter(permissionFilter === 'Obtain' ? '' : 'Obtain')}
+          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full font-medium transition-all flex-shrink-0 cursor-pointer ${
+            permissionFilter === 'Obtain'
+              ? 'bg-emerald-700 text-white shadow-xs font-semibold'
+              : 'bg-white/80 hover:bg-emerald-50 text-emerald-900 border border-emerald-200'
+          }`}
+        >
+          Permission Obtained
+        </button>
+
+        {/* Permission Pending */}
+        <button
+          type="button"
+          onClick={() => setPermissionFilter(permissionFilter === 'Pending' ? '' : 'Pending')}
+          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full font-medium transition-all flex-shrink-0 cursor-pointer ${
+            permissionFilter === 'Pending'
+              ? 'bg-amber-600 text-white shadow-xs font-semibold'
+              : 'bg-white/80 hover:bg-amber-50 text-amber-900 border border-amber-200'
+          }`}
+        >
+          Permission Pending
+        </button>
+
+        {/* Proposal Accept */}
+        <button
+          type="button"
+          onClick={() => setProposalFilter(proposalFilter === 'Accept' ? '' : 'Accept')}
+          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full font-medium transition-all flex-shrink-0 cursor-pointer ${
+            proposalFilter === 'Accept'
+              ? 'bg-teal-700 text-white shadow-xs font-semibold'
+              : 'bg-white/80 hover:bg-teal-50 text-teal-900 border border-teal-200'
+          }`}
+        >
+          Proposal Accept
+        </button>
+
+        {/* Proposal Reject */}
+        <button
+          type="button"
+          onClick={() => setProposalFilter(proposalFilter === 'Reject' ? '' : 'Reject')}
+          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full font-medium transition-all flex-shrink-0 cursor-pointer ${
+            proposalFilter === 'Reject'
+              ? 'bg-rose-700 text-white shadow-xs font-semibold'
+              : 'bg-white/80 hover:bg-rose-50 text-rose-900 border border-rose-200'
+          }`}
+        >
+          Proposal Reject
+        </button>
+      </div>
+
+      {/* Advanced Filter Drawer */}
+      {isAdvancedFiltersOpen && (
+        <div className="bg-[#FAF7F0] border border-[#D5CCA8] rounded-xl p-4 mb-3.5 shadow-sm animate-in fade-in slide-in-from-top-2 duration-150">
+          <div className="flex items-center justify-between pb-2.5 border-b border-[#D8CEB2]/80 mb-3">
+            <div className="flex items-center gap-2">
+              <SlidersHorizontal className="w-4 h-4 text-[#000E89]" />
+              <h4 className="text-[14px] font-bold text-ink-text font-serif">Advanced Filters & Sorting</h4>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsAdvancedFiltersOpen(false)}
+              className="text-ink-text-soft hover:text-ink-text p-1"
+              title="Close filter panel"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-[12.5px]">
+            {/* Proposal Status */}
+            <div>
+              <label className="block text-[11px] font-bold text-ink-text-soft uppercase tracking-wider mb-1">
+                Proposal Status
+              </label>
+              <select
+                aria-label="Filter by proposal status"
+                className="app-input py-1.5 px-2.5 text-[12.5px] bg-white w-full"
+                value={proposalFilter}
+                onChange={e => setProposalFilter(e.target.value)}
+              >
+                <option value="">All Proposals</option>
+                <option value="Accept">Accept</option>
+                <option value="Reject">Reject</option>
+              </select>
+            </div>
+
+            {/* Permission Status */}
+            <div>
+              <label className="block text-[11px] font-bold text-ink-text-soft uppercase tracking-wider mb-1">
+                Permission Status
+              </label>
+              <select
+                aria-label="Filter by permission status"
+                className="app-input py-1.5 px-2.5 text-[12.5px] bg-white w-full"
+                value={permissionFilter}
+                onChange={e => setPermissionFilter(e.target.value)}
+              >
+                <option value="">All Permissions</option>
+                <option value="Obtain">Obtained</option>
+                <option value="Pending">Pending</option>
+                <option value="Reject">Rejected</option>
+              </select>
+            </div>
+
+            {/* Petition Type */}
+            <div>
+              <label className="block text-[11px] font-bold text-ink-text-soft uppercase tracking-wider mb-1">
+                Petition Type
+              </label>
+              <select
+                aria-label="Filter by petition type"
+                className="app-input py-1.5 px-2.5 text-[12.5px] bg-white w-full"
+                value={typeFilter}
+                onChange={e => setTypeFilter(e.target.value)}
+              >
+                <option value="">All Types</option>
+                <option value="Complaint">Complaint</option>
+                <option value="Suo Motu">Suo Motu</option>
+              </select>
+            </div>
+
+            {/* Sort Order */}
+            <div>
+              <label className="block text-[11px] font-bold text-ink-text-soft uppercase tracking-wider mb-1 flex items-center justify-between">
+                <span>Sort By</span>
+                <button
+                  type="button"
+                  onClick={() => setSortOrder(o => o === 'asc' ? 'desc' : 'asc')}
+                  className="text-[10px] text-[#000E89] font-bold hover:underline inline-flex items-center gap-0.5"
+                >
+                  <ArrowUpDown className="w-3 h-3" />
+                  {sortOrder === 'asc' ? 'Ascending ↑' : 'Descending ↓'}
+                </button>
+              </label>
+              <select
+                aria-label="Sort petitions by"
+                className="app-input py-1.5 px-2.5 text-[12.5px] bg-white w-full"
+                value={sortBy}
+                onChange={e => setSortBy(e.target.value)}
+              >
+                <option value="createdAt">Date Created</option>
+                <option value="petitionNo">Petition No. (A–Z)</option>
+                <option value="peNo">PE No.</option>
+                <option value="peRegDate">PE Registration Date</option>
+                <option value="district">District (A–Z)</option>
+              </select>
+            </div>
+
+            {/* Officer-Wise Filter Block */}
+            <div className="sm:col-span-2 lg:col-span-4 bg-[#F2EDE1]/60 border border-[#D5CCA8] rounded-xl p-3.5 shadow-2xs">
+              <div className="flex items-center justify-between mb-2.5">
+                <span className="text-[12px] font-bold text-[#000E89] uppercase tracking-wider flex items-center gap-1.5 font-serif">
+                  <Shield className="w-3.5 h-3.5 text-brass" />
+                  Officer-Wise Filter (ಅಧಿಕಾರಿವಾರು ಫಿಲ್ಟರ್)
+                </span>
+                {officerFilter && (
+                  <button
+                    type="button"
+                    onClick={() => { setOfficerFilter(''); setOfficerRoleFilter('all'); }}
+                    className="text-[11px] font-semibold text-maroon hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <X className="w-3 h-3" />
+                    Clear Officer Filter
+                  </button>
+                )}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="sm:col-span-2">
+                  <label className="block text-[11px] font-bold text-ink-text-soft uppercase tracking-wider mb-1">
+                    Officer Name (Search or Select)
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      list="available-officers-datalist"
+                      placeholder="Type or pick officer name (Police / SIR Officer / Accused Respondent)…"
+                      className="app-input py-1.5 px-3 text-[12.5px] bg-white w-full pr-8"
+                      value={officerFilter}
+                      onChange={e => setOfficerFilter(e.target.value)}
+                    />
+                    {officerFilter && (
+                      <button
+                        type="button"
+                        onClick={() => setOfficerFilter('')}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-text-faint hover:text-ink-text"
+                        title="Clear officer name"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                  <datalist id="available-officers-datalist">
+                    {availableOfficers.map((o, idx) => (
+                      <option key={`${o.name}-${idx}`} value={o.name}>
+                        {o.name} {o.designation ? `(${o.designation})` : ''} — {o.role}
+                      </option>
+                    ))}
+                  </datalist>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-ink-text-soft uppercase tracking-wider mb-1">
+                    Officer Role
+                  </label>
+                  <select
+                    aria-label="Filter officer role"
+                    className="app-input py-1.5 px-2.5 text-[12.5px] bg-white w-full"
+                    value={officerRoleFilter}
+                    onChange={e => setOfficerRoleFilter(e.target.value)}
+                  >
+                    <option value="all">All Roles (SIR & Respondent)</option>
+                    <option value="investigating">Investigating / SIR Officer</option>
+                    <option value="respondent">Accused / Respondent Officer</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Date Range Fields */}
+            <div className="sm:col-span-2 lg:col-span-4 grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-[#D8CEB2]/60">
+              <div>
+                <label className="block text-[11px] font-bold text-ink-text-soft uppercase tracking-wider mb-1">
+                  Date Field
+                </label>
+                <select
+                  aria-label="Filter date field"
+                  className="app-input py-1.5 px-2.5 text-[12.5px] bg-white w-full"
+                  value={dateField}
+                  onChange={e => setDateField(e.target.value)}
+                >
+                  <option value="createdAt">Created Date</option>
+                  <option value="peRegDate">PE Registration Date</option>
+                  <option value="proposalSentDate">Proposal Sent Date</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-ink-text-soft uppercase tracking-wider mb-1">
+                  From Date
+                </label>
+                <input
+                  type="date"
+                  className="app-input py-1.5 px-2.5 text-[12.5px] bg-white w-full"
+                  value={dateFrom}
+                  onChange={e => setDateFrom(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-ink-text-soft uppercase tracking-wider mb-1">
+                  To Date
+                </label>
+                <input
+                  type="date"
+                  className="app-input py-1.5 px-2.5 text-[12.5px] bg-white w-full"
+                  value={dateTo}
+                  onChange={e => setDateTo(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-2.5 mt-3 pt-2.5 border-t border-[#D8CEB2]/60">
+            <button
+              type="button"
+              onClick={clearAllFilters}
+              className="btn btn-secondary py-1.5 px-3 text-[12px]"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              Reset All
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsAdvancedFiltersOpen(false)}
+              className="btn btn-primary py-1.5 px-4 text-[12px]"
+            >
+              Apply & Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Active Filter Tags */}
+      {activeFilters.length > 0 && (
+        <div className="flex items-center gap-1.5 mb-3 flex-wrap text-[11.5px] bg-white/70 border border-[#D5CCA8] p-2 rounded-lg shadow-2xs">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-ink-text-soft px-1 flex items-center gap-1">
+            <Filter className="w-3 h-3 text-[#000E89]" />
+            Active ({activeFilters.length}):
+          </span>
+          {activeFilters.map(f => (
+            <span
+              key={f.id}
+              className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#E8EEF9] text-[#000E89] border border-[#CBD8EF] font-medium shadow-2xs"
+            >
+              {f.label}
+              <button
+                type="button"
+                onClick={f.clear}
+                className="w-3.5 h-3.5 rounded-full inline-flex items-center justify-center hover:bg-[#000E89] hover:text-white transition-colors cursor-pointer"
+                title="Remove filter"
+              >
+                <X className="w-2.5 h-2.5" />
+              </button>
+            </span>
+          ))}
+          <button
+            type="button"
+            onClick={clearAllFilters}
+            className="ml-auto text-[11px] font-bold text-maroon hover:underline flex items-center gap-1 cursor-pointer"
+          >
+            Clear All
+          </button>
+        </div>
+      )}
+
       {/* Table */}
       {!loading && entries.length === 0 ? (
         <div className="flex flex-col items-center text-center py-20 px-5 bg-white rounded-xl border border-[#D5CCA8] shadow-sm">
           <ArchiveX className="w-[52px] h-[52px] text-ink-text-faint mb-[18px]" strokeWidth={1.5} />
           <h3 className="text-[19px] text-ink-text mb-2 font-serif font-semibold">
-            {debouncedSearch || districtFilter || statusFilter ? 'No results match your filters' : 'No petitions on file yet'}
+            {activeFilters.length > 0 ? 'No results match your filters' : 'No petitions on file yet'}
           </h3>
           <p className="text-[13.5px] text-ink-text-soft mb-6 max-w-[340px]">
-            {debouncedSearch || districtFilter || statusFilter
+            {activeFilters.length > 0
               ? 'Try adjusting your search or clearing the filters.'
               : 'Add the first petition to begin the register.'}
           </p>
-          {(!debouncedSearch && !districtFilter && !statusFilter) && (
+          {activeFilters.length === 0 && (
             <button type="button" className="btn btn-primary" onClick={() => navigate('/register/new')}>
               <Plus className="w-[18px] h-[18px]" strokeWidth={2.3} />
               Add Petition
@@ -349,20 +1012,120 @@ export default function RegisterList() {
         </div>
       ) : (
         <section className="bg-white border border-[#D5CCA8] rounded-xl overflow-hidden shadow-[0_4px_20px_rgba(0,14,137,0.05)]">
-          <div className="overflow-x-auto">
-            <table className="data-table">
+          {/* Top Control Bar: Scroll Controls & Pagination */}
+          <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-[#FAF7F0] border-b border-[#D8CEB2] flex-wrap text-[12.5px]">
+            {/* Left: Summary & Rows per page */}
+            <div className="flex items-center gap-3 flex-wrap">
+              <span className="text-[12.5px] text-ink-text-soft font-medium">
+                Showing <strong className="font-semibold text-ink-text">{startEntry}–{endEntry}</strong> of{' '}
+                <strong className="font-semibold text-ink-text">{total.toLocaleString()}</strong> records
+              </span>
+
+              <div className="flex items-center gap-1.5 pl-2 border-l border-[#D5CCA8]/70">
+                <label className="text-[12px] text-ink-text-soft font-medium">Rows:</label>
+                <select
+                  aria-label="Rows per page"
+                  className="app-input py-1 px-2 text-[12px] font-semibold w-auto min-w-[62px] h-[30px] bg-white cursor-pointer"
+                  value={pageSize}
+                  onChange={e => { setPageSize(Number(e.target.value)); setPage(1); }}
+                >
+                  {PAGE_SIZE_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+            </div>
+
+            {/* Right: Top Page Navigation & Page Selector */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => goToPage(1)}
+                  disabled={page === 1}
+                  className="w-7 h-7 flex items-center justify-center rounded-md border border-[#D5CCA8] bg-white hover:bg-[#EAE4D2] text-ink-text disabled:opacity-40 disabled:pointer-events-none transition-all shadow-2xs cursor-pointer"
+                  title="First page"
+                >
+                  <ChevronsLeft className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => goToPage(page - 1)}
+                  disabled={page === 1}
+                  className="w-7 h-7 flex items-center justify-center rounded-md border border-[#D5CCA8] bg-white hover:bg-[#EAE4D2] text-ink-text disabled:opacity-40 disabled:pointer-events-none transition-all shadow-2xs cursor-pointer"
+                  title="Previous page"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                </button>
+
+                {totalPages > 1 ? (
+                  <div className="flex items-center gap-1 mx-1">
+                    <span className="text-[11.5px] text-ink-text-soft font-medium">Page</span>
+                    <select
+                      aria-label="Select page"
+                      value={page}
+                      onChange={e => goToPage(Number(e.target.value))}
+                      className="app-input py-0.5 px-2 text-[12px] font-bold text-[#000E89] w-auto min-w-[54px] h-[28px] bg-white border-[#000E89]/40 cursor-pointer"
+                    >
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+                        <option key={p} value={p}>
+                          {p}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="text-[11.5px] text-ink-text-soft font-medium">of {totalPages}</span>
+                  </div>
+                ) : (
+                  <span className="text-[12px] font-bold text-[#000E89] px-2 font-mono">
+                    Page 1 of 1
+                  </span>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => goToPage(page + 1)}
+                  disabled={page === totalPages}
+                  className="w-7 h-7 flex items-center justify-center rounded-md border border-[#D5CCA8] bg-white hover:bg-[#EAE4D2] text-ink-text disabled:opacity-40 disabled:pointer-events-none transition-all shadow-2xs cursor-pointer"
+                  title="Next page"
+                >
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => goToPage(totalPages)}
+                  disabled={page === totalPages}
+                  className="w-7 h-7 flex items-center justify-center rounded-md border border-[#D5CCA8] bg-white hover:bg-[#EAE4D2] text-ink-text disabled:opacity-40 disabled:pointer-events-none transition-all shadow-2xs cursor-pointer"
+                  title="Last page"
+                >
+                  <ChevronsRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Synced Top Horizontal Scrollbar */}
+          <div
+            ref={topScrollRef}
+            onScroll={handleTopScroll}
+            className="overflow-x-auto bg-[#F4EFE6] border-b border-[#D8CEB2]/80 h-[10px] cursor-pointer"
+            style={{ scrollBehavior: 'smooth' }}
+            title="Drag to scroll columns horizontally"
+          >
+            <div style={{ width: `${Math.max(1380, scrollWidth)}px`, height: '10px' }} />
+          </div>
+
+          <div ref={tableContainerRef} className="overflow-x-auto" style={{ scrollBehavior: 'smooth' }}>
+            <table className="data-table min-w-[1380px] w-full">
               <thead>
                 <tr>
-                  <th className="w-[60px] text-center">Case #</th>
-                  <th className="w-[56px] text-center">Action</th>
+                  <th className="w-[60px] min-w-[60px] text-center">Case #</th>
+                  <th className="w-[56px] min-w-[56px] text-center">Action</th>
                   <th className="min-w-[130px]">District</th>
                   <th className="min-w-[170px]">Petition No.</th>
                   <th className="min-w-[170px]">Petitioner</th>
                   <th className="min-w-[220px]">Respondents</th>
-                  <th className="min-w-[110px]">Proposal</th>
-                  <th className="min-w-[120px]">Permission</th>
-                  <th className="min-w-[140px]">PE No. & Date</th>
-                  <th className="min-w-[130px]">PE Status</th>
+                  <th className="min-w-[110px] text-center">Proposal</th>
+                  <th className="min-w-[120px] text-center">Permission</th>
+                  <th className="min-w-[140px] text-center">PE No. & Date</th>
+                  <th className="min-w-[140px] text-center">PE Status</th>
                 </tr>
               </thead>
               <tbody>
@@ -383,12 +1146,12 @@ export default function RegisterList() {
                         onClick={() => handleOpenView(entry)}
                         className={`group transition-all duration-150 cursor-pointer case-row ${
                           idx % 2 === 0 ? 'case-row-odd' : 'case-row-even'
-                        }`}
+                        } ${tableDensity === 'compact' ? 'text-[12px]' : 'text-[13px]'}`}
                       >
                         {/* Case Number Badge */}
-                        <td className="text-center px-2 py-3 align-middle">
+                        <td className={`text-center align-middle ${tableDensity === 'compact' ? 'px-2 py-1.5' : 'px-2 py-3'}`}>
                           <div className="flex flex-col items-center justify-center gap-0.5">
-                            <span className="inline-flex items-center justify-center min-w-[28px] h-7 px-1.5 rounded-md bg-[#000E89] text-white font-mono text-[12px] font-bold shadow-xs">
+                            <span className={`inline-flex items-center justify-center min-w-[26px] ${tableDensity === 'compact' ? 'h-6 text-[11px]' : 'h-7 text-[12px]'} px-1.5 rounded-md bg-[#000E89] text-white font-mono font-bold shadow-xs`}>
                               {(page - 1) * pageSize + idx + 1}
                             </span>
                             <span className="text-[9px] font-bold tracking-wider text-[#7C88A2] uppercase">
@@ -398,7 +1161,7 @@ export default function RegisterList() {
                         </td>
 
                         {/* Actions (placed immediately after Case # / SL No) */}
-                        <td onClick={e => e.stopPropagation()} className="text-center px-2 align-middle">
+                        <td onClick={e => e.stopPropagation()} className={`text-center px-2 align-middle ${tableDensity === 'compact' ? 'py-1.5' : 'py-3'}`}>
                           <button
                             type="button"
                             className={`w-7 h-7 rounded-lg inline-flex items-center justify-center transition-all border ${
@@ -414,7 +1177,7 @@ export default function RegisterList() {
                         </td>
 
                         {/* District */}
-                        <td className="whitespace-nowrap">
+                        <td className={`whitespace-nowrap ${tableDensity === 'compact' ? 'py-1.5 px-3' : 'py-3.5 px-4'}`}>
                           <div className="flex items-center gap-1.5 font-semibold text-ink-text text-[13px]">
                             <MapPin className="w-3.5 h-3.5 text-brass flex-shrink-0" />
                             <span>{entry.district || '—'}</span>
@@ -422,7 +1185,7 @@ export default function RegisterList() {
                         </td>
 
                         {/* Petition No. */}
-                        <td>
+                        <td className={tableDensity === 'compact' ? 'py-1.5 px-3' : 'py-3.5 px-4'}>
                           <div className="flex flex-col items-start gap-1">
                             <span
                               className="inline-flex items-center gap-1.5 font-mono text-[12px] font-bold text-[#000E89] bg-[#E8EEF9] border border-[#CBD8EF] px-2.5 py-1 rounded-md shadow-xs whitespace-nowrap"
@@ -434,8 +1197,8 @@ export default function RegisterList() {
                             {entry.type && (
                               <span className={`inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded border ${
                                 (entry.type || '').toLowerCase().includes('suo')
-                                  ? 'bg-purple-50 text-purple-700 border-purple-200'
-                                  : 'bg-slate-50 text-slate-600 border-slate-200'
+                                    ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                    : 'bg-slate-50 text-slate-600 border-slate-200'
                               }`}>
                                 {entry.type}
                               </span>
@@ -444,7 +1207,7 @@ export default function RegisterList() {
                         </td>
 
                         {/* Petitioner */}
-                        <td className="max-w-[200px]">
+                        <td className={`max-w-[200px] ${tableDensity === 'compact' ? 'py-1.5 px-3' : 'py-3.5 px-4'}`}>
                           <div className="font-semibold text-ink-text text-[13px] leading-snug line-clamp-2" title={entry.petitionerName}>
                             {entry.petitionerName}
                           </div>
@@ -462,13 +1225,24 @@ export default function RegisterList() {
                               visibleRespondents.map((r, i) => (
                                 <div
                                   key={r.id || i}
-                                  className="min-h-[46px] px-4 py-2 flex items-center gap-2 text-[12.5px] leading-tight"
+                                  className={`${tableDensity === 'compact' ? 'min-h-[38px] px-3 py-1 text-[12px]' : 'min-h-[46px] px-4 py-2 text-[12.5px]'} flex items-center gap-2 leading-tight`}
                                   title={`${r.name}${r.designation ? ` (${r.designation})` : ''}${r.department ? ` · ${r.department}` : ''}`}
                                 >
                                   <span className="w-5 h-5 rounded-full bg-[#EAE4D2] text-[#4A3E25] text-[10px] font-bold flex items-center justify-center flex-shrink-0 shadow-2xs border border-[#DDD5BE]">
                                     {i + 1}
                                   </span>
-                                  <span className="font-semibold text-ink-text truncate">{r.name}</span>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setOfficerFilter(r.name);
+                                      setOfficerRoleFilter('respondent');
+                                    }}
+                                    className="font-semibold text-ink-text hover:text-[#000E89] hover:underline truncate cursor-pointer text-left"
+                                    title={`Click to filter cases by respondent: ${r.name}`}
+                                  >
+                                    {r.name}
+                                  </button>
                                   {r.designation && (
                                     <span className="text-[11.5px] text-ink-text-soft truncate font-normal">
                                       · {r.designation}
@@ -477,7 +1251,7 @@ export default function RegisterList() {
                                 </div>
                               ))
                             ) : (
-                              <div className="min-h-[46px] px-4 py-2 flex items-center text-[12px] text-ink-text-faint italic font-mono">
+                              <div className={`${tableDensity === 'compact' ? 'min-h-[38px]' : 'min-h-[46px]'} px-4 py-2 flex items-center text-[12px] text-ink-text-faint italic font-mono`}>
                                 —
                               </div>
                             )}
@@ -516,12 +1290,12 @@ export default function RegisterList() {
                           <div className="divide-y divide-[#E2D9C2]">
                             {visibleRespondents.length > 0 ? (
                               visibleRespondents.map((r, i) => (
-                                <div key={r.id || i} className="min-h-[46px] px-4 py-2 flex items-center">
+                                <div key={r.id || i} className={`${tableDensity === 'compact' ? 'min-h-[38px] px-3 py-1' : 'min-h-[46px] px-4 py-2'} flex items-center`}>
                                   {renderProposalBadge(entry.proposalStatus)}
                                 </div>
                               ))
                             ) : (
-                              <div className="min-h-[46px] px-4 py-2 flex items-center">
+                              <div className={`${tableDensity === 'compact' ? 'min-h-[38px] px-3 py-1' : 'min-h-[46px] px-4 py-2'} flex items-center`}>
                                 {renderProposalBadge(entry.proposalStatus)}
                               </div>
                             )}
@@ -540,12 +1314,12 @@ export default function RegisterList() {
                           <div className="divide-y divide-[#E2D9C2]">
                             {visibleRespondents.length > 0 ? (
                               visibleRespondents.map((r, i) => (
-                                <div key={r.id || i} className="min-h-[46px] px-4 py-2 flex items-center">
+                                <div key={r.id || i} className={`${tableDensity === 'compact' ? 'min-h-[38px] px-3 py-1' : 'min-h-[46px] px-4 py-2'} flex items-center`}>
                                   {renderPermissionBadge(r.permissionStatus)}
                                 </div>
                               ))
                             ) : (
-                              <div className="min-h-[46px] px-4 py-2 flex items-center text-[12px] text-ink-text-faint italic font-mono">
+                              <div className={`${tableDensity === 'compact' ? 'min-h-[38px] px-3 py-1' : 'min-h-[46px] px-4 py-2'} flex items-center text-[12px] text-ink-text-faint italic font-mono`}>
                                 —
                               </div>
                             )}
@@ -560,7 +1334,7 @@ export default function RegisterList() {
                         </td>
 
                         {/* PE No. & Date - displayed ONCE per petition */}
-                        <td className="px-3.5 py-3 align-middle text-center">
+                        <td className={`align-middle text-center ${tableDensity === 'compact' ? 'px-2 py-1.5' : 'px-3.5 py-3'}`}>
                           <div className="flex flex-col items-center justify-center gap-1">
                             {entry.peNo ? (
                               <span className="font-mono text-[11px] font-bold text-[#000E89] bg-[#E8EEF9] border border-[#CBD8EF] px-2 py-0.5 rounded shadow-2xs whitespace-nowrap">
@@ -579,7 +1353,7 @@ export default function RegisterList() {
                         </td>
 
                         {/* PE Status - displayed ONCE per petition */}
-                        <td className="px-3.5 py-3 align-middle text-center">
+                        <td className={`align-middle text-center ${tableDensity === 'compact' ? 'px-2 py-1.5' : 'px-3.5 py-3'}`}>
                           <div className="flex items-center justify-center">
                             {renderPeStatusBadge(entry.peStatus)}
                           </div>
@@ -593,7 +1367,7 @@ export default function RegisterList() {
           </div>
 
           {/* Pagination footer */}
-          {totalPages > 1 || total > 10 ? (
+          {total > 0 ? (
             <div className="flex items-center justify-between gap-4 px-5 py-3.5 border-t border-rule/60 bg-[#FFFDF9] flex-wrap gap-y-3">
               {/* Entry count */}
               <div className="text-[12.5px] text-ink-text-soft font-medium">
@@ -605,7 +1379,8 @@ export default function RegisterList() {
               <div className="flex items-center gap-2 flex-wrap">
                 <label className="text-[12px] text-ink-text-soft">Rows:</label>
                 <select
-                  className="app-input py-1.5 px-2 text-[12.5px] w-auto min-w-0"
+                  aria-label="Rows per page (bottom)"
+                  className="app-input py-1.5 px-2 text-[12.5px] w-auto min-w-0 bg-white"
                   value={pageSize}
                   onChange={e => { setPageSize(Number(e.target.value)); setPage(1); }}
                 >
@@ -619,9 +1394,30 @@ export default function RegisterList() {
                   <button onClick={() => goToPage(page - 1)} disabled={page === 1} className="icon-btn" title="Previous page">
                     <ChevronLeft className="w-4 h-4" />
                   </button>
-                  <span className="text-[12.5px] font-medium text-ink-text px-2">
-                    {page} / {totalPages}
-                  </span>
+
+                  {totalPages > 1 ? (
+                    <div className="flex items-center gap-1 mx-1">
+                      <span className="text-[11.5px] text-ink-text-soft font-medium">Page</span>
+                      <select
+                        aria-label="Select page (bottom)"
+                        value={page}
+                        onChange={e => goToPage(Number(e.target.value))}
+                        className="app-input py-0.5 px-2 text-[12px] font-bold text-[#000E89] w-auto min-w-[50px] h-[28px] bg-white border-[#000E89]/40 cursor-pointer"
+                      >
+                        {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+                          <option key={p} value={p}>
+                            {p}
+                          </option>
+                        ))}
+                      </select>
+                      <span className="text-[11.5px] text-ink-text-soft font-medium">of {totalPages}</span>
+                    </div>
+                  ) : (
+                    <span className="text-[12.5px] font-medium text-ink-text px-2 font-mono">
+                      Page 1 / 1
+                    </span>
+                  )}
+
                   <button onClick={() => goToPage(page + 1)} disabled={page === totalPages} className="icon-btn" title="Next page">
                     <ChevronRight className="w-4 h-4" />
                   </button>
@@ -853,7 +1649,23 @@ export default function RegisterList() {
                     </div>
                     <div>
                       <span className="text-[11.5px] font-bold text-ink-text-soft block mb-1">SIR Officer Name</span>
-                      <div className="font-semibold text-ink-text">{viewingEntry.sirOfficerName || '—'}</div>
+                      <div className="font-semibold text-ink-text flex items-center gap-2 flex-wrap">
+                        <span>{viewingEntry.sirOfficerName || '—'}</span>
+                        {viewingEntry.sirOfficerName && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setOfficerFilter(viewingEntry.sirOfficerName);
+                              setOfficerRoleFilter('investigating');
+                              setViewingEntry(null);
+                            }}
+                            className="text-[10px] font-bold text-[#000E89] hover:text-white bg-[#E8EEF9] hover:bg-[#000E89] px-2 py-0.5 rounded border border-[#CBD8EF] transition-all cursor-pointer"
+                            title="Filter petitions by this SIR Officer"
+                          >
+                            Filter Cases
+                          </button>
+                        )}
+                      </div>
                     </div>
                     <div>
                       <span className="text-[11.5px] font-bold text-ink-text-soft block mb-1">Officer Rank</span>
@@ -891,7 +1703,21 @@ export default function RegisterList() {
                             <tr key={r.id || i}>
                               <td className="text-center font-mono font-semibold text-ink-text-soft">{i + 1}</td>
                               <td>
-                                <div className="font-bold text-ink-text text-[13px]">{r.name}</div>
+                                <div className="flex items-center gap-2">
+                                  <div className="font-bold text-ink-text text-[13px]">{r.name}</div>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setOfficerFilter(r.name);
+                                      setOfficerRoleFilter('respondent');
+                                      setViewingEntry(null);
+                                    }}
+                                    className="text-[10px] font-bold text-[#000E89] hover:text-white bg-[#E8EEF9] hover:bg-[#000E89] px-1.5 py-0.2 rounded border border-[#CBD8EF] transition-all cursor-pointer"
+                                    title="Filter cases by this respondent"
+                                  >
+                                    Filter
+                                  </button>
+                                </div>
                                 {r.designation && <div className="text-[11.5px] text-ink-text-soft">{r.designation}</div>}
                               </td>
                               <td><span className="text-[12.5px]">{r.office || '—'}</span></td>

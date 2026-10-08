@@ -5,11 +5,35 @@ import { saveAs } from 'file-saver';
 
 const authHeaders = () => ({ 'Authorization': `Bearer ${localStorage.getItem('token')}` });
 
-export async function exportPetitionsToExcel({ search = '', district = '', status = '' } = {}) {
+export async function exportPetitionsToExcel({
+  search = '',
+  district = '',
+  status = '',
+  proposalStatus = '',
+  permissionStatus = '',
+  type = '',
+  sortBy = '',
+  sortOrder = '',
+  dateFrom = '',
+  dateTo = '',
+  dateField = '',
+  officer = '',
+  officerRole = ''
+} = {}) {
   const params = new URLSearchParams({ all: 'true' });
   if (search) params.set('search', search);
   if (district) params.set('district', district);
   if (status) params.set('status', status);
+  if (proposalStatus) params.set('proposalStatus', proposalStatus);
+  if (permissionStatus) params.set('permissionStatus', permissionStatus);
+  if (type) params.set('type', type);
+  if (sortBy) params.set('sortBy', sortBy);
+  if (sortOrder) params.set('sortOrder', sortOrder);
+  if (dateFrom) params.set('dateFrom', dateFrom);
+  if (dateTo) params.set('dateTo', dateTo);
+  if (dateField) params.set('dateField', dateField);
+  if (officer) params.set('officer', officer);
+  if (officerRole) params.set('officerRole', officerRole);
 
   const res = await apiFetch(`/petitions?${params.toString()}`);
   if (!res.ok) throw new Error('Failed to fetch petitions');

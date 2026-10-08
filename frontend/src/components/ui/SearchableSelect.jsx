@@ -11,7 +11,8 @@ import {
   Compass, 
   CornerDownLeft, 
   ArrowUpDown,
-  Sparkles
+  Sparkles,
+  UserPlus
 } from 'lucide-react';
 import Modal from './Modal';
 
@@ -70,7 +71,10 @@ export default function SearchableSelect({
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return normalized;
-    return normalized.filter(o => o.label.toLowerCase().includes(q));
+    return normalized.filter(o => 
+      o.label.toLowerCase().includes(q) || 
+      (o.sublabel && o.sublabel.toLowerCase().includes(q))
+    );
   }, [normalized, query]);
 
   const title = label || placeholder || 'Select Option';
@@ -111,8 +115,8 @@ export default function SearchableSelect({
     }
   }, [highlighted, open]);
 
-  const commit = useCallback((opt) => {
-    onChange(opt.value);
+  const commit = useCallback((opt, extraPayload) => {
+    onChange(opt.value, extraPayload);
     closePicker();
   }, [onChange, closePicker]);
 
@@ -125,7 +129,11 @@ export default function SearchableSelect({
       setHighlighted(h => Math.max(h - 1, 0));
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      if (filtered[highlighted]) commit(filtered[highlighted]);
+      if (filtered[highlighted]) {
+        commit(filtered[highlighted]);
+      } else if (filtered.length === 0 && normalized.some(o => o.value === '__OLD_OFFICER__')) {
+        commit({ value: '__OLD_OFFICER__' }, query.trim());
+      }
     } else if (e.key === 'Escape') {
       e.preventDefault();
       closePicker();
@@ -276,12 +284,32 @@ export default function SearchableSelect({
                 >
                   Clear Search Filter
                 </button>
+
+                {normalized.some(o => o.value === '__OLD_OFFICER__') && (
+                  <div className="mt-4 pt-4 border-t border-dashed border-rule w-full flex flex-col items-center">
+                    <p className="text-[12px] text-ink-text-soft mb-2.5">
+                      Officer not found in active list?
+                    </p>
+                    <button
+                      type="button"
+                      tabIndex={-1}
+                      onClick={() => commit({ value: '__OLD_OFFICER__' }, query.trim())}
+                      className="px-4 py-2 text-xs font-bold rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-950 border border-amber-300 transition-all shadow-xs flex items-center gap-2 cursor-pointer hover:shadow-sm"
+                    >
+                      <UserPlus className="w-4 h-4 text-amber-900" />
+                      <span>
+                        {query.trim() ? `Use "${query.trim()}" as Old Officer` : 'Select "Old Officer" (Enter Manually)'}
+                      </span>
+                    </button>
+                  </div>
+                )}
               </div>
             ) : (
               <div role="listbox" className="space-y-1">
                 {filtered.map((opt, idx) => {
                   const isSelected = opt.value === value;
                   const isHighlighted = idx === highlighted;
+                  const isOldOfficerOpt = opt.value === '__OLD_OFFICER__' || opt.isOldOfficer;
 
                   // Initials or Monogram for option
                   const words = opt.label.trim().split(/\s+/);
@@ -300,7 +328,11 @@ export default function SearchableSelect({
                       onMouseEnter={() => setHighlighted(idx)}
                       onClick={() => commit(opt)}
                       className={`w-full flex items-center justify-between gap-3 text-left p-2.5 rounded-xl text-[13.5px] transition-all duration-150 border group cursor-pointer ${
-                        isSelected
+                        isOldOfficerOpt
+                          ? isHighlighted
+                            ? 'bg-amber-100/90 border-amber-400 shadow-xs translate-x-1'
+                            : 'bg-amber-50/60 border-amber-200/90 hover:bg-amber-100/70'
+                          : isSelected
                           ? 'bg-amber-500/10 border-[#C9A15E] shadow-xs'
                           : isHighlighted
                           ? 'bg-white border-rule shadow-xs translate-x-1'
@@ -310,21 +342,35 @@ export default function SearchableSelect({
                       <div className="flex items-center gap-3 min-w-0">
                         {/* Monogram / Icon Avatar */}
                         <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-[11px] font-mono font-bold flex-shrink-0 transition-colors ${
-                          isSelected 
+                          isOldOfficerOpt
+                            ? 'bg-amber-200 text-amber-900 border border-amber-300'
+                            : isSelected 
                             ? 'bg-[#C9A15E] text-ink shadow-xs' 
                             : isHighlighted 
                             ? 'bg-ink text-[#F5EFE1]' 
                             : 'bg-parchment-2 text-ink-text-soft border border-rule/50'
                         }`}>
-                          {monogram}
+                          {isOldOfficerOpt ? <UserPlus className="w-4 h-4 text-amber-900" /> : monogram}
                         </div>
 
                         {/* Label with highlighted match */}
                         <div className="min-w-0">
-                          <div className={`leading-snug truncate ${isSelected ? 'font-bold text-ink-text' : 'font-medium text-ink-text'}`}>
+                          <div className={`leading-snug truncate flex items-center gap-2 ${
+                            isOldOfficerOpt ? 'font-bold text-amber-950' : isSelected ? 'font-bold text-ink-text' : 'font-medium text-ink-text'
+                          }`}>
                             <HighlightedText text={opt.label} query={query} />
+                            {isOldOfficerOpt && (
+                              <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.2 rounded bg-amber-200 text-amber-900 border border-amber-300">
+                                Manual Entry
+                              </span>
+                            )}
                           </div>
-                          {isSelected && (
+                          {opt.sublabel && (
+                            <div className="text-[11.5px] text-ink-text-soft mt-0.5 truncate">
+                              {opt.sublabel}
+                            </div>
+                          )}
+                          {!opt.sublabel && isSelected && (
                             <span className="text-[10.5px] text-emerald-700 font-medium">
                               Currently selected
                             </span>
@@ -334,7 +380,12 @@ export default function SearchableSelect({
 
                       {/* Right Action Badge */}
                       <div className="flex items-center gap-2 flex-shrink-0">
-                        {isSelected ? (
+                        {isOldOfficerOpt ? (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-900 bg-amber-200/70 px-2 py-0.5 rounded border border-amber-300">
+                            <span>Type Name</span>
+                            <CornerDownLeft className="w-3 h-3" />
+                          </span>
+                        ) : isSelected ? (
                           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200 shadow-xs">
                             <Check className="w-3.5 h-3.5 stroke-[2.5]" />
                             <span>Selected</span>
