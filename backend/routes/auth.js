@@ -15,21 +15,28 @@ router.post('/login', async (req, res) => {
 
     const user = await prisma.user.findUnique({
       where: { email },
-      include: { district: true }
+      include: {
+        district: true,
+        designation: { include: { district: true } }
+      }
     });
 
     if (!user || !user.isActive || !(await bcrypt.compare(password, user.password))) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
+    const effectiveDistrictId = user.districtId || user.designation?.districtId || null;
+    const effectiveDistrictName = user.district?.name || user.designation?.district?.name || null;
+    const isHeadOffice = user.isHeadOffice === true;
+
     const token = jwt.sign(
       { 
         userId: user.id, 
         email: user.email, 
         role: user.role,
-        districtId: user.districtId,
-        isHeadOffice: user.isHeadOffice,
-        districtName: user.district?.name
+        districtId: effectiveDistrictId,
+        isHeadOffice,
+        districtName: effectiveDistrictName
       },
       process.env.JWT_SECRET || 'supersecret17a',
       { expiresIn: '12h' }
@@ -41,9 +48,9 @@ router.post('/login', async (req, res) => {
       role: user.role, 
       fullName: user.fullName, 
       userId: user.id,
-      districtId: user.districtId,
-      isHeadOffice: user.isHeadOffice,
-      districtName: user.district?.name
+      districtId: effectiveDistrictId,
+      isHeadOffice,
+      districtName: effectiveDistrictName
     });
   } catch (error) {
     console.error('Login error:', error);

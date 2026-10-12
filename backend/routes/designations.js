@@ -8,11 +8,22 @@ router.use(authMiddleware);
 // Get all designations (optionally filter by districtId)
 router.get('/', async (req, res) => {
   try {
-    const { districtId } = req.query;
+    const { districtId, includeAllDistricts } = req.query;
+    let where = {};
+    if (districtId) {
+      if (includeAllDistricts === 'false') {
+        where.districtId = districtId;
+      } else {
+        where = {
+          OR: [
+            { districtId: districtId },
+            { districtId: null }
+          ]
+        };
+      }
+    }
     const designations = await prisma.designation.findMany({
-      where: {
-        ...(districtId ? { districtId } : {})
-      },
+      where,
       include: {
         district: {
           select: { id: true, name: true, shortName: true }
@@ -27,39 +38,43 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Create designation — district selection is mandatory
+// Create designation — supports district-specific OR state-wide (All Districts / Head Office)
 router.post('/', async (req, res) => {
   try {
-    const { name, districtId, isActive } = req.body;
+    const { name, districtId, isAllDistricts, isActive } = req.body;
     const cleanName = (name || '').trim();
     const cleanDistrictId = (districtId || '').trim();
 
     if (!cleanName) {
       return res.status(400).json({ error: 'Designation name is required' });
     }
-    if (!cleanDistrictId) {
-      return res.status(400).json({ error: 'District is mandatory for creating a designation' });
-    }
 
-    const district = await prisma.district.findUnique({ where: { id: cleanDistrictId } });
-    if (!district) {
-      return res.status(400).json({ error: 'Selected district does not exist' });
+    const isGlobal = isAllDistricts === true || !cleanDistrictId;
+    let targetDistrictId = null;
+
+    if (!isGlobal) {
+      const district = await prisma.district.findUnique({ where: { id: cleanDistrictId } });
+      if (!district) {
+        return res.status(400).json({ error: 'Selected district does not exist' });
+      }
+      targetDistrictId = cleanDistrictId;
     }
 
     const existing = await prisma.designation.findFirst({
       where: {
         name: { equals: cleanName, mode: 'insensitive' },
-        districtId: cleanDistrictId
+        districtId: targetDistrictId
       }
     });
     if (existing) {
-      return res.status(409).json({ error: `Designation "${cleanName}" already exists in ${district.name}` });
+      const locText = targetDistrictId ? 'in the selected district' : 'for All Districts / Head Office';
+      return res.status(409).json({ error: `Designation "${cleanName}" already exists ${locText}` });
     }
 
     const designation = await prisma.designation.create({
       data: {
         name: cleanName,
-        districtId: cleanDistrictId,
+        districtId: targetDistrictId,
         isActive: isActive !== false
       },
       include: {
@@ -75,42 +90,46 @@ router.post('/', async (req, res) => {
   }
 });
 
-// Update designation — district selection is mandatory
+// Update designation — supports district-specific OR state-wide
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, districtId, isActive } = req.body;
+    const { name, districtId, isAllDistricts, isActive } = req.body;
     const cleanName = (name || '').trim();
     const cleanDistrictId = (districtId || '').trim();
 
     if (!cleanName) {
       return res.status(400).json({ error: 'Designation name is required' });
     }
-    if (!cleanDistrictId) {
-      return res.status(400).json({ error: 'District is mandatory for designation' });
-    }
 
-    const district = await prisma.district.findUnique({ where: { id: cleanDistrictId } });
-    if (!district) {
-      return res.status(400).json({ error: 'Selected district does not exist' });
+    const isGlobal = isAllDistricts === true || !cleanDistrictId;
+    let targetDistrictId = null;
+
+    if (!isGlobal) {
+      const district = await prisma.district.findUnique({ where: { id: cleanDistrictId } });
+      if (!district) {
+        return res.status(400).json({ error: 'Selected district does not exist' });
+      }
+      targetDistrictId = cleanDistrictId;
     }
 
     const existing = await prisma.designation.findFirst({
       where: {
         name: { equals: cleanName, mode: 'insensitive' },
-        districtId: cleanDistrictId,
+        districtId: targetDistrictId,
         NOT: { id }
       }
     });
     if (existing) {
-      return res.status(409).json({ error: `Designation "${cleanName}" already exists in ${district.name}` });
+      const locText = targetDistrictId ? 'in the selected district' : 'for All Districts / Head Office';
+      return res.status(409).json({ error: `Designation "${cleanName}" already exists ${locText}` });
     }
 
     const designation = await prisma.designation.update({
       where: { id },
       data: {
         name: cleanName,
-        districtId: cleanDistrictId,
+        districtId: targetDistrictId,
         isActive: isActive !== undefined ? (isActive === true || isActive === '1') : undefined
       },
       include: {

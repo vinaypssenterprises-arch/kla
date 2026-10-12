@@ -89,7 +89,7 @@ export default function Masters() {
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
-  const [form, setForm] = useState({ name: '', shortName: '', isActive: true, parentId: '', districtId: '' });
+  const [form, setForm] = useState({ name: '', shortName: '', isActive: true, parentId: '', districtId: '', isAllDistricts: false });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -142,19 +142,28 @@ export default function Masters() {
 
   const openCreate = () => {
     setEditingItem(null);
-    setForm({ name: '', shortName: '', isActive: true, parentId: '', districtId: districtFilter || '' });
+    setForm({
+      name: '',
+      shortName: '',
+      isActive: true,
+      parentId: '',
+      districtId: districtFilter && districtFilter !== '__STATE_WIDE__' ? districtFilter : '',
+      isAllDistricts: districtFilter === '__STATE_WIDE__'
+    });
     setError('');
     setModalOpen(true);
   };
 
   const openEdit = (item) => {
     setEditingItem(item);
+    const isStateWide = !item.districtId && !item.district?.id;
     setForm({
       name: item.name,
       shortName: item.shortName || '',
       isActive: item.isActive !== false,
       parentId: item.parentId || '',
-      districtId: item.districtId || item.district?.id || ''
+      districtId: item.districtId || item.district?.id || '',
+      isAllDistricts: isStateWide
     });
     setError('');
     setModalOpen(true);
@@ -189,8 +198,8 @@ export default function Masters() {
       return;
     }
 
-    if (active.hasDistrict && !form.districtId) {
-      setError(`District is mandatory. Please select a district.`);
+    if (active.hasDistrict && !form.isAllDistricts && !form.districtId) {
+      setError(`Please select a district or check "All Districts / Head Office".`);
       return;
     }
 
@@ -201,7 +210,10 @@ export default function Masters() {
         isActive: form.isActive !== false,
         ...(active.isDistrict ? { shortName: form.shortName ? form.shortName.trim().toUpperCase() : null } : {}),
         ...(active.apiCategory === 'subDepartment' ? { parentId: form.parentId } : {}),
-        ...(active.hasDistrict ? { districtId: form.districtId } : {})
+        ...(active.hasDistrict ? {
+          districtId: form.isAllDistricts ? null : (form.districtId || null),
+          isAllDistricts: form.isAllDistricts
+        } : {})
       };
 
       const url = editingItem ? `${baseUrl}/${editingItem.id}` : baseUrl;
@@ -257,7 +269,11 @@ export default function Masters() {
       // District filter for designations
       if (active.hasDistrict && districtFilter) {
         const itemDistId = item.districtId || item.district?.id;
-        if (itemDistId !== districtFilter) return false;
+        if (districtFilter === '__STATE_WIDE__') {
+          if (itemDistId) return false;
+        } else if (itemDistId !== districtFilter) {
+          return false;
+        }
       }
 
       // Search query
@@ -270,7 +286,7 @@ export default function Masters() {
         ? departments.find(d => d.id === item.parentId)?.name?.toLowerCase().includes(q)
         : false;
       const districtMatch = active.hasDistrict
-        ? (item.district?.name?.toLowerCase().includes(q) || item.district?.shortName?.toLowerCase().includes(q))
+        ? (item.district?.name?.toLowerCase().includes(q) || item.district?.shortName?.toLowerCase().includes(q) || (!item.district && ('all districts head office state-wide').includes(q)))
         : false;
 
       return nameMatch || shortMatch || parentMatch || districtMatch;
@@ -448,16 +464,20 @@ export default function Masters() {
 
               {/* District Filter Dropdown for Designations */}
               {active.hasDistrict && districts.length > 0 && (
-                <div className="w-full sm:w-[220px]">
+                <div className="w-full sm:w-[240px]">
                   <SearchableSelect
                     value={districtFilter}
                     onChange={setDistrictFilter}
-                    options={[{ value: '', label: 'All Districts' }, ...districts.map(d => ({
-                      value: d.id,
-                      label: d.shortName ? `${d.name} (${d.shortName})` : d.name
-                    }))]}
+                    options={[
+                      { value: '', label: 'All Jurisdictions' },
+                      { value: '__STATE_WIDE__', label: '★ All Districts / Head Office' },
+                      ...districts.map(d => ({
+                        value: d.id,
+                        label: d.shortName ? `${d.name} (${d.shortName})` : d.name
+                      }))
+                    ]}
                     label="Filter by District"
-                    placeholder="All Districts"
+                    placeholder="All Jurisdictions"
                   />
                 </div>
               )}
@@ -616,15 +636,22 @@ export default function Masters() {
                     {/* Linked District for Designations */}
                     {active.hasDistrict && (
                       <td className="py-3 px-4">
-                        <div className="flex items-center gap-1.5 text-[13px] text-ink-text font-medium">
-                          <MapPin className="w-3.5 h-3.5 text-brass flex-shrink-0" />
-                          <span>{item.district?.name || '—'}</span>
-                          {item.district?.shortName && (
-                            <span className="font-mono text-[10.5px] font-bold text-[#000E89] bg-[#E8EEF9] border border-[#CBD8EF] px-1.5 py-0.2 rounded">
-                              {item.district.shortName}
-                            </span>
-                          )}
-                        </div>
+                        {item.district ? (
+                          <div className="flex items-center gap-1.5 text-[13px] text-ink-text font-medium">
+                            <MapPin className="w-3.5 h-3.5 text-brass flex-shrink-0" />
+                            <span>{item.district.name}</span>
+                            {item.district.shortName && (
+                              <span className="font-mono text-[10.5px] font-bold text-[#000E89] bg-[#E8EEF9] border border-[#CBD8EF] px-1.5 py-0.2 rounded">
+                                {item.district.shortName}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded text-[11px] font-bold bg-[#E8EEF9] text-[#000E89] border border-[#CBD8EF] shadow-2xs">
+                            <Building2 className="w-3.5 h-3.5 text-[#000E89]" />
+                            All Districts (Head Office)
+                          </span>
+                        )}
                       </td>
                     )}
 
@@ -798,25 +825,60 @@ export default function Masters() {
               </div>
             )}
 
-            {/* District Selector for Designations (MANDATORY) */}
+            {/* District Selector for Designations */}
             {active.hasDistrict && (
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[12.5px] font-semibold text-ink-text">
-                  District <span className="text-brick">*</span>
+              <div className="flex flex-col gap-2.5 bg-[#FAF6ED] p-3.5 rounded-lg border border-rule/70">
+                {/* Checkbox: All Districts / Head Office (State-wide) */}
+                <label className="flex items-start gap-2.5 cursor-pointer bg-white p-2.5 rounded-lg border border-rule/70 hover:border-rule transition-colors">
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 rounded border-rule mt-0.5 accent-maroon"
+                    checked={form.isAllDistricts}
+                    onChange={e => {
+                      const checked = e.target.checked;
+                      setForm({
+                        ...form,
+                        isAllDistricts: checked,
+                        districtId: checked ? '' : form.districtId
+                      });
+                    }}
+                  />
+                  <div>
+                    <span className="text-[12.5px] font-semibold text-ink-text block">
+                      All Districts / Head Office (State-wide)
+                    </span>
+                    <span className="text-[11px] text-ink-text-faint block mt-0.5">
+                      Check this for state-wide cadres, C&amp;T, ADGP, DIG, SP Headquarters, or posts not restricted to a single district.
+                    </span>
+                  </div>
                 </label>
-                <SearchableSelect
-                  value={form.districtId}
-                  onChange={v => setForm({ ...form, districtId: v })}
-                  options={districts.map(d => ({
-                    value: d.id,
-                    label: d.shortName ? `${d.name} (${d.shortName})` : d.name
-                  }))}
-                  label="Select District"
-                  placeholder="Search and select district..."
-                />
-                <span className="text-[11px] text-ink-text-faint">
-                  Mandatory: Every designation must be assigned to a specific district.
-                </span>
+
+                {/* District dropdown if not All Districts */}
+                {!form.isAllDistricts ? (
+                  <div className="flex flex-col gap-1.5 mt-1">
+                    <label className="text-[12px] font-semibold text-ink-text">
+                      District <span className="text-brick">*</span>
+                    </label>
+                    <SearchableSelect
+                      value={form.districtId}
+                      onChange={v => setForm({ ...form, districtId: v })}
+                      options={districts.map(d => ({
+                        value: d.id,
+                        label: d.shortName ? `${d.name} (${d.shortName})` : d.name
+                      }))}
+                      label="Select District"
+                      placeholder="Search and select district..."
+                    />
+                    <span className="text-[11px] text-ink-text-faint">
+                      Select the specific district jurisdiction for this designation.
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 p-2 rounded bg-[#E8EEF9]/70 border border-[#CBD8EF] text-[12px] text-[#000E89] font-medium">
+                    <Sparkles className="w-4 h-4 flex-shrink-0 text-brass" />
+                    <span>This designation will apply across all 36 districts and Head Office units.</span>
+                  </div>
+                )}
               </div>
             )}
 

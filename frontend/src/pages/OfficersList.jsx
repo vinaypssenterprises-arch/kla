@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Plus, ShieldOff, Eye, Pencil, Trash2, Download, RotateCcw } from 'lucide-react';
+import { Search, Plus, ShieldOff, Eye, Pencil, Trash2, Download, RotateCcw, MapPin } from 'lucide-react';
 import { exportOfficersToExcel } from '../lib/exportExcel';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import SearchableSelect from '../components/ui/SearchableSelect';
@@ -19,9 +19,13 @@ export default function OfficersList() {
 
   const currentUserId = localStorage.getItem('userId');
   const role = localStorage.getItem('role');
+  const isHeadOffice = localStorage.getItem('isHeadOffice') === '1';
+  const userDistrictId = localStorage.getItem('districtId') || '';
+  const userDistrictName = localStorage.getItem('districtName') || '';
+  const isGlobalUser = role === 'admin' || isHeadOffice;
 
   const [search, setSearch] = useState('');
-  const [districtId, setDistrictId] = useState('');
+  const [districtId, setDistrictId] = useState(!isGlobalUser && userDistrictId ? userDistrictId : '');
   const [designation, setDesignation] = useState('');
 
   const [districts, setDistricts] = useState([]);
@@ -69,7 +73,7 @@ export default function OfficersList() {
 
   const resetFilters = () => {
     setSearch('');
-    setDistrictId('');
+    setDistrictId(!isGlobalUser && userDistrictId ? userDistrictId : '');
     setDesignation('');
   };
 
@@ -134,13 +138,20 @@ export default function OfficersList() {
             onChange={e => setSearch(e.target.value)}
           />
         </div>
-        <SearchableSelect
-          className="w-auto min-w-[170px]"
-          value={districtId}
-          onChange={setDistrictId}
-          options={[{ value: '', label: 'All Districts' }, ...districts.map(d => ({ value: d.id, label: d.name }))]}
-          label="Filter by District"
-        />
+        {!isGlobalUser && userDistrictName ? (
+          <span className="font-mono text-xs font-bold text-[#000E89] bg-[#E8EEF9] border border-[#CBD8EF] px-3 py-2 rounded-lg shadow-2xs inline-flex items-center gap-1.5 flex-shrink-0">
+            <MapPin className="w-3.5 h-3.5 text-brass" />
+            {userDistrictName}
+          </span>
+        ) : (
+          <SearchableSelect
+            className="w-auto min-w-[170px]"
+            value={districtId}
+            onChange={setDistrictId}
+            options={[{ value: '', label: 'All Districts' }, ...districts.map(d => ({ value: d.id, label: d.name }))]}
+            label="Filter by District"
+          />
+        )}
         <SearchableSelect
           className="w-auto min-w-[170px]"
           value={designation}

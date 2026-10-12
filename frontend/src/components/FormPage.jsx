@@ -336,7 +336,7 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments,
   const peRankOptions = useMemo(() => {
     if (!currentDistrictObj) return [];
     const fromDesigs = designations
-      .filter(d => d.districtId === currentDistrictObj.id && d.isActive)
+      .filter(d => (!d.districtId || d.districtId === currentDistrictObj.id) && d.isActive)
       .map(d => d.name);
     const fromOfficers = officers
       .filter(o => o.districtId === currentDistrictObj.id && o.isActive && o.designation)

@@ -8,7 +8,8 @@ import {
   Calendar,
   Layers,
   Sparkles,
-  AlertCircle
+  AlertCircle,
+  MapPin
 } from 'lucide-react';
 import StatCards from '../components/dashboard/StatCards';
 import PipelineFunnel from '../components/dashboard/PipelineFunnel';
@@ -22,8 +23,13 @@ export default function DashboardHome() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
 
+  const role = localStorage.getItem('role');
+  const isHeadOffice = localStorage.getItem('isHeadOffice') === '1';
+  const isGlobalUser = role === 'admin' || isHeadOffice;
+  const userDistrict = localStorage.getItem('districtName');
+
   // Interactive filters
-  const [selectedDistrict, setSelectedDistrict] = useState('ALL');
+  const [selectedDistrict, setSelectedDistrict] = useState(isGlobalUser ? 'ALL' : (userDistrict || 'ALL'));
   const [timeframe, setTimeframe] = useState('all');
   const [currentTime, setCurrentTime] = useState(new Date());
 
@@ -146,20 +152,27 @@ export default function DashboardHome() {
             </div>
 
             {/* District dropdown */}
-            <select
-              value={selectedDistrict}
-              onChange={(e) => setSelectedDistrict(e.target.value)}
-              className="text-xs bg-white border border-rule/80 rounded-lg px-2.5 py-1.5 text-ink-text font-medium focus:ring-1 focus:ring-brass focus:outline-none shadow-xs min-w-[190px]"
-            >
-              <option value="ALL">All Districts (State-wide)</option>
-              {(data?.districts || []).map((dist) => (
-                <option key={dist} value={dist}>
-                  {dist}
-                </option>
-              ))}
-            </select>
+            {!isGlobalUser && userDistrict ? (
+              <span className="font-mono text-xs font-bold text-[#000E89] bg-[#E8EEF9] border border-[#CBD8EF] px-3 py-1.5 rounded-lg shadow-2xs inline-flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 text-brass" />
+                {userDistrict} District Jurisdiction
+              </span>
+            ) : (
+              <select
+                value={selectedDistrict}
+                onChange={(e) => setSelectedDistrict(e.target.value)}
+                className="text-xs bg-white border border-rule/80 rounded-lg px-2.5 py-1.5 text-ink-text font-medium focus:ring-1 focus:ring-brass focus:outline-none shadow-xs min-w-[190px]"
+              >
+                <option value="ALL">All Districts (State-wide)</option>
+                {(data?.districts || []).map((dist) => (
+                  <option key={dist} value={dist}>
+                    {dist}
+                  </option>
+                ))}
+              </select>
+            )}
 
-            {selectedDistrict !== 'ALL' && (
+            {isGlobalUser && selectedDistrict !== 'ALL' && (
               <button
                 onClick={() => setSelectedDistrict('ALL')}
                 className="text-[11px] text-maroon hover:underline font-semibold ml-1"

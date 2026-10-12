@@ -123,7 +123,7 @@ function OfficerFormInner({ initialData, districts, allDesignations = [] }) {
   // Filter designations belonging to the currently selected district
   const designationOptions = useMemo(() => {
     if (!watchedDistrictId) return [];
-    const matching = allDesignations.filter(d => d.districtId === watchedDistrictId);
+    const matching = allDesignations.filter(d => !d.districtId || d.districtId === watchedDistrictId);
     const opts = matching.map(d => ({
       value: d.name,
       label: d.name

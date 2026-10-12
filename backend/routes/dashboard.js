@@ -8,6 +8,17 @@ router.use(authMiddleware);
 
 router.get('/stats', async (req, res) => {
   try {
+    const isGlobalUser = req.user.role === 'admin' || req.user.isHeadOffice === true;
+    const userDistrictName = req.user.districtName;
+    const userDistrictId = req.user.districtId;
+
+    const petitionFilter = !isGlobalUser && userDistrictName
+      ? { district: { equals: userDistrictName, mode: 'insensitive' } }
+      : {};
+    const officerFilter = !isGlobalUser && userDistrictId
+      ? { districtId: userDistrictId, isActive: true }
+      : { isActive: true };
+
     const [
       totalPetitions,
       acceptedProposals,
@@ -15,11 +26,11 @@ router.get('/stats', async (req, res) => {
       firRegistered,
       totalOfficers
     ] = await Promise.all([
-      prisma.petition.count(),
-      prisma.petition.count({ where: { proposalStatus: 'Accept' } }),
-      prisma.respondent.count({ where: { permissionStatus: 'Obtain' } }),
-      prisma.petition.count({ where: { peStatus: 'Register FIR' } }),
-      prisma.officer.count({ where: { isActive: true } })
+      prisma.petition.count({ where: petitionFilter }),
+      prisma.petition.count({ where: { ...petitionFilter, proposalStatus: 'Accept' } }),
+      prisma.respondent.count({ where: { ...(petitionFilter.district ? { petition: petitionFilter } : {}), permissionStatus: 'Obtain' } }),
+      prisma.petition.count({ where: { ...petitionFilter, peStatus: 'Register FIR' } }),
+      prisma.officer.count({ where: officerFilter })
     ]);
 
     res.json({
@@ -119,9 +130,16 @@ function getPetitionDate(p) {
 // District-wise and PE-status-wise breakdowns for the Reports page
 router.get('/reports', async (req, res) => {
   try {
+    const isGlobalUser = req.user.role === 'admin' || req.user.isHeadOffice === true;
+    const userDistrictName = req.user.districtName;
+    const userDistrictId = req.user.districtId;
+
     const fromDateStr = req.query.fromDate ? req.query.fromDate.trim() : null;
     const toDateStr = req.query.toDate ? req.query.toDate.trim() : null;
-    const filterDistrict = req.query.district ? req.query.district.trim() : null;
+    let filterDistrict = req.query.district ? req.query.district.trim() : null;
+    if (!isGlobalUser && userDistrictName) {
+      filterDistrict = userDistrictName;
+    }
 
     let fromDate = fromDateStr ? new Date(`${fromDateStr}T00:00:00.000Z`) : null;
     let toDate = toDateStr ? new Date(`${toDateStr}T23:59:59.999Z`) : null;
@@ -142,17 +160,37 @@ router.get('/reports', async (req, res) => {
     }
 
     const [allDbDistricts, petitions, peGroups, officersByDistrict] = await Promise.all([
-      prisma.district.findMany({ where: { isActive: true }, select: { id: true, name: true } }),
+      prisma.district.findMany({
+        where: {
+          isActive: true,
+          ...((!isGlobalUser && userDistrictId) ? { id: userDistrictId } : {})
+        },
+        select: { id: true, name: true }
+      }),
       prisma.petition.findMany({
+        where: (!isGlobalUser && userDistrictName) ? { district: { equals: userDistrictName, mode: 'insensitive' } } : {},
         include: { respondents: true }
       }),
-      prisma.petition.groupBy({ by: ['peStatus'], _count: { _all: true } }),
-      prisma.officer.groupBy({ by: ['districtId'], where: { isActive: true }, _count: { _all: true } })
+      prisma.petition.groupBy({
+        by: ['peStatus'],
+        where: (!isGlobalUser && userDistrictName) ? { district: { equals: userDistrictName, mode: 'insensitive' } } : {},
+        _count: { _all: true }
+      }),
+      prisma.officer.groupBy({
+        by: ['districtId'],
+        where: {
+          isActive: true,
+          ...((!isGlobalUser && userDistrictId) ? { districtId: userDistrictId } : {})
+        },
+        _count: { _all: true }
+      })
     ]);
 
     const districtNameById = Object.fromEntries(allDbDistricts.map(d => [d.id, d.name]));
 
-    const orderedDistricts = [...STANDARD_DISTRICT_ORDER];
+    const orderedDistricts = (!isGlobalUser && userDistrictName)
+      ? [normalizeDistrictName(userDistrictName)]
+      : [...STANDARD_DISTRICT_ORDER];
     allDbDistricts.forEach(d => {
       const norm = normalizeDistrictName(d.name);
       if (!orderedDistricts.includes(norm)) {
@@ -346,19 +384,28 @@ router.get('/reports', async (req, res) => {
 // Comprehensive analytics endpoint for Executive Visualization Dashboard
 router.get('/analytics', async (req, res) => {
   try {
-    const { district, timeframe } = req.query;
+    const isGlobalUser = req.user.role === 'admin' || req.user.isHeadOffice === true;
+    const userDistrictName = req.user.districtName;
+    const userDistrictId = req.user.districtId;
+
+    let targetDistrict = req.query.district;
+    if (!isGlobalUser && userDistrictName) {
+      targetDistrict = userDistrictName;
+    }
+
+    const { timeframe } = req.query;
 
     // Cache analytics results — expensive query, 60s TTL per filter combo
-    const cacheKey = `analytics:${district || 'ALL'}:${timeframe || 'all'}`;
+    const cacheKey = `analytics:${targetDistrict || 'ALL'}:${timeframe || 'all'}`;
     const cached = await redisClient.get(cacheKey);
     if (cached) return res.json(JSON.parse(cached));
 
     const petitionWhere = {};
     const officerWhere = { isActive: true };
 
-    if (district && district !== 'ALL') {
-      petitionWhere.district = district;
-      officerWhere.district = { name: district };
+    if (targetDistrict && targetDistrict !== 'ALL') {
+      petitionWhere.district = { equals: targetDistrict, mode: 'insensitive' };
+      officerWhere.district = { name: { equals: targetDistrict, mode: 'insensitive' } };
     }
 
     if (timeframe && timeframe !== 'all') {
@@ -381,7 +428,10 @@ router.get('/analytics', async (req, res) => {
         orderBy: { createdAt: 'desc' }
       }),
       prisma.district.findMany({
-        where: { isActive: true },
+        where: {
+          isActive: true,
+          ...((!isGlobalUser && userDistrictId) ? { id: userDistrictId } : {})
+        },
         select: { id: true, name: true },
         orderBy: { name: 'asc' }
       }),
@@ -390,7 +440,9 @@ router.get('/analytics', async (req, res) => {
         select: { id: true, name: true, designation: true, district: { select: { name: true } } }
       }),
       prisma.respondent.findMany({
-        where: district && district !== 'ALL' ? { petition: { district } } : {},
+        where: targetDistrict && targetDistrict !== 'ALL'
+          ? { petition: { district: { equals: targetDistrict, mode: 'insensitive' } } }
+          : {},
         include: {
           petition: {
             select: { id: true, petitionNo: true, district: true, status: true, proposalSentDate: true }
@@ -624,7 +676,7 @@ router.get('/analytics', async (req, res) => {
 
     const analyticsResult = {
       districts: allDistricts.map(d => d.name),
-      selectedDistrict: district || 'ALL',
+      selectedDistrict: targetDistrict || 'ALL',
       overview: {
         totalPetitions,
         acceptedProposals,

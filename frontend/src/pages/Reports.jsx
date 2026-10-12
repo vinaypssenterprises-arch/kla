@@ -166,14 +166,19 @@ export default function Reports() {
   const [dbDistricts, setDbDistricts] = useState([]);
   const [chartExtraData, setChartExtraData] = useState(null);
 
+  const role = localStorage.getItem('role');
+  const isHeadOffice = localStorage.getItem('isHeadOffice') === '1';
+  const userDistrictName = localStorage.getItem('districtName') || '';
+  const isGlobalUser = role === 'admin' || isHeadOffice;
+
   // Filters state (Defaults to 'ALL' - All Years Cumulative)
   const [focusYear, setFocusYear] = useState('ALL');
-  const [selectedDistrict, setSelectedDistrict] = useState('');
+  const [selectedDistrict, setSelectedDistrict] = useState(!isGlobalUser && userDistrictName ? normalizeDistrictName(userDistrictName) : '');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
 
   // Applied filters (applied only when "Apply Filter" is clicked)
-  const [appliedDistrict, setAppliedDistrict] = useState('');
+  const [appliedDistrict, setAppliedDistrict] = useState(!isGlobalUser && userDistrictName ? normalizeDistrictName(userDistrictName) : '');
   const [appliedFromDate, setAppliedFromDate] = useState('');
   const [appliedToDate, setAppliedToDate] = useState('');
 
@@ -217,6 +222,9 @@ export default function Reports() {
 
   // Compute Master Ordered District List
   const allOrderedDistricts = useMemo(() => {
+    if (!isGlobalUser && userDistrictName) {
+      return [normalizeDistrictName(userDistrictName)];
+    }
     const list = [...STANDARD_DISTRICT_ORDER];
     if (Array.isArray(dbDistricts)) {
       dbDistricts.forEach(d => {
@@ -228,7 +236,7 @@ export default function Reports() {
       });
     }
     return list;
-  }, [dbDistricts]);
+  }, [dbDistricts, isGlobalUser, userDistrictName]);
 
   const currentYear = useMemo(() => new Date().getFullYear(), []);
 
@@ -451,10 +459,11 @@ export default function Reports() {
 
   // Reset Filters
   const handleResetFilter = () => {
-    setSelectedDistrict('');
+    const defaultDist = !isGlobalUser && userDistrictName ? normalizeDistrictName(userDistrictName) : '';
+    setSelectedDistrict(defaultDist);
     setFromDate('');
     setToDate('');
-    setAppliedDistrict('');
+    setAppliedDistrict(defaultDist);
     setAppliedFromDate('');
     setAppliedToDate('');
     setSearchTerm('');
@@ -714,16 +723,23 @@ export default function Reports() {
                 <MapPin className="w-3.5 h-3.5 text-[#A97B33]" />
                 District Unit:
               </label>
-              <select
-                value={selectedDistrict}
-                onChange={(e) => setSelectedDistrict(e.target.value)}
-                className="bg-white border border-rule rounded-lg px-3 py-1.5 text-[12.5px] font-semibold text-ink-text focus:outline-none focus:ring-2 focus:ring-[#000E89]/20 focus:border-[#000E89] min-w-[190px]"
-              >
-                <option value="">All Districts (33 Units)</option>
-                {STANDARD_DISTRICT_ORDER.map(d => (
-                  <option key={d} value={d}>{d}</option>
-                ))}
-              </select>
+              {!isGlobalUser && userDistrictName ? (
+                <span className="font-mono text-xs font-bold text-[#000E89] bg-[#E8EEF9] border border-[#CBD8EF] px-3 py-1.5 rounded-lg flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 text-brass" />
+                  {normalizeDistrictName(userDistrictName)} (Assigned Unit)
+                </span>
+              ) : (
+                <select
+                  value={selectedDistrict}
+                  onChange={(e) => setSelectedDistrict(e.target.value)}
+                  className="bg-white border border-rule rounded-lg px-3 py-1.5 text-[12.5px] font-semibold text-ink-text focus:outline-none focus:ring-2 focus:ring-[#000E89]/20 focus:border-[#000E89] min-w-[190px]"
+                >
+                  <option value="">All Districts ({STANDARD_DISTRICT_ORDER.length} Units)</option>
+                  {STANDARD_DISTRICT_ORDER.map(d => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </select>
+              )}
             </div>
 
             <div className="h-5 w-[1px] bg-rule/60 hidden md:block" />

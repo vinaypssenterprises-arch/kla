@@ -58,20 +58,21 @@ router.get('/', async (req, res) => {
     const sortBy = sortableFields.includes(req.query.sortBy) ? req.query.sortBy : 'createdAt';
     const sortDir = req.query.sortDir === 'asc' ? 'asc' : 'desc';
 
-    let allowedCreatorIds = null;
-    if (req.user.role !== 'admin' && req.query.forSelect !== 'true') {
-      const supervisees = await prisma.user.findMany({
-        where: { supervisorUserId: req.user.userId },
-        select: { id: true }
-      });
-      allowedCreatorIds = [req.user.userId, ...supervisees.map(s => s.id)];
+    const isGlobalUser = req.user.role === 'admin' || req.user.isHeadOffice === true;
+    const userDistrictId = req.user.districtId;
+
+    let effectiveDistrictId = districtId;
+    if (!isGlobalUser) {
+      if (!userDistrictId) {
+        return res.status(403).json({ error: 'Access denied: User is not assigned to any district or Head Office' });
+      }
+      effectiveDistrictId = userDistrictId;
     }
 
     const where = {
       isActive: true,
-      ...(districtId ? { districtId } : {}),
+      ...(effectiveDistrictId ? { districtId: effectiveDistrictId } : {}),
       ...(designation ? { designation } : {}),
-      ...(allowedCreatorIds ? { createdById: { in: allowedCreatorIds } } : {}),
       ...(search ? {
         OR: [
           { name: { contains: search, mode: 'insensitive' } },
@@ -129,8 +130,15 @@ router.get('/meta/designations', async (req, res) => {
 // Get a single officer with previous places + audit info
 router.get('/:id', async (req, res) => {
   try {
+    const isGlobalUser = req.user.role === 'admin' || req.user.isHeadOffice === true;
+    const userDistrictId = req.user.districtId;
+
     const officer = await prisma.officer.findFirst({
-      where: { id: req.params.id, isActive: true },
+      where: {
+        id: req.params.id,
+        isActive: true,
+        ...((!isGlobalUser && userDistrictId) ? { districtId: userDistrictId } : {})
+      },
       include: {
         ...officerInclude,
         createdBy: { select: { id: true, email: true, fullName: true } },
@@ -194,13 +202,14 @@ router.put('/:id', canWrite, async (req, res) => {
     const existingOfficer = await prisma.officer.findUnique({ where: { id } });
     if (!existingOfficer) return res.status(404).json({ error: 'Officer not found' });
 
-    if (req.user.role !== 'admin' && existingOfficer.createdById !== req.user.userId) {
-      return res.status(403).json({ error: 'You can only edit records you created' });
+    const isGlobalUser = req.user.role === 'admin' || req.user.isHeadOffice === true;
+    if (!isGlobalUser && req.user.districtId && existingOfficer.districtId !== req.user.districtId) {
+      return res.status(403).json({ error: 'Access denied: You can only edit officers in your assigned district' });
     }
 
     // Admin & Head Office can reassign to any district; regular district users stay locked to their district
     let targetDistrictId = data.districtId;
-    if (req.user.role !== 'admin' && !req.user.isHeadOffice && req.user.districtId) {
+    if (!isGlobalUser && req.user.districtId) {
       targetDistrictId = req.user.districtId;
     }
 
@@ -241,8 +250,9 @@ router.delete('/:id', canWrite, async (req, res) => {
     const existingOfficer = await prisma.officer.findUnique({ where: { id: req.params.id } });
     if (!existingOfficer) return res.status(404).json({ error: 'Officer not found' });
 
-    if (req.user.role !== 'admin' && existingOfficer.createdById !== req.user.userId) {
-      return res.status(403).json({ error: 'You can only delete records you created' });
+    const isGlobalUser = req.user.role === 'admin' || req.user.isHeadOffice === true;
+    if (!isGlobalUser && req.user.districtId && existingOfficer.districtId !== req.user.districtId) {
+      return res.status(403).json({ error: 'Access denied: You can only delete officers in your assigned district' });
     }
 
     await prisma.officer.update({

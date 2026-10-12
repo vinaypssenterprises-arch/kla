@@ -37,18 +37,21 @@ router.get('/', async (req, res) => {
     const officerFilter = (req.query.officer || '').trim();
     const officerRole = (req.query.officerRole || 'all').trim();
 
-    let allowedCreatorIds = null;
-    if (req.user.role !== 'admin') {
-      const supervisees = await prisma.user.findMany({
-        where: { supervisorUserId: req.user.userId },
-        select: { id: true }
-      });
-      allowedCreatorIds = [req.user.userId, ...supervisees.map(s => s.id)];
+    const isGlobalUser = req.user.role === 'admin' || req.user.isHeadOffice === true;
+    const userDistrictName = req.user.districtName;
+
+    // Enforce district boundary:
+    // If not admin and not head office, user MUST ONLY see petitions of their assigned district
+    let effectiveDistrict = districtFilter;
+    if (!isGlobalUser) {
+      if (!userDistrictName) {
+        return res.status(403).json({ error: 'Access denied: User is not assigned to any district or Head Office' });
+      }
+      effectiveDistrict = userDistrictName;
     }
 
     const where = {
-      ...(allowedCreatorIds ? { createdById: { in: allowedCreatorIds } } : {}),
-      ...(districtFilter ? { district: districtFilter } : {}),
+      ...(effectiveDistrict ? { district: { equals: effectiveDistrict, mode: 'insensitive' } } : {}),
       ...(statusFilter ? { peStatus: { equals: statusFilter, mode: 'insensitive' } } : {}),
       ...(proposalStatusFilter ? { proposalStatus: { equals: proposalStatusFilter, mode: 'insensitive' } } : {}),
       ...(typeFilter ? { type: { equals: typeFilter, mode: 'insensitive' } } : {}),
@@ -124,18 +127,18 @@ router.get('/', async (req, res) => {
     else if (sortBy === 'proposalSentDate') orderBy = { proposalSentDate: sortOrder };
     else if (sortBy === 'createdAt') orderBy = { createdAt: sortOrder };
 
-    // Try cache only for admin with no filters
-    const isUnfiltered = req.user.role === 'admin' && !search && !districtFilter && !statusFilter &&
+    // Try cache only for global user with no filters
+    const isUnfiltered = isGlobalUser && !search && !districtFilter && !statusFilter &&
       !proposalStatusFilter && !permissionStatusFilter && !typeFilter && !dateFrom && !dateTo &&
       !officerFilter && sortBy === 'createdAt' && sortOrder === 'desc' && page === 1 && !isAll;
 
-    const cacheKey = `petitions:p${page}:ps${pageSize}`;
+    const cacheKey = `petitions:${isGlobalUser ? 'all' : effectiveDistrict}:p${page}:ps${pageSize}`;
     if (isUnfiltered) {
       const cached = await redisClient.get(cacheKey);
       if (cached) return res.json(JSON.parse(cached));
     }
 
-    const baseWhere = allowedCreatorIds ? { createdById: { in: allowedCreatorIds } } : {};
+    const baseWhere = effectiveDistrict ? { district: { equals: effectiveDistrict, mode: 'insensitive' } } : {};
 
     const [petitions, total, pePendingCount, firCount, deCount, closeCount] = await Promise.all([
       prisma.petition.findMany({
@@ -273,9 +276,21 @@ router.post('/', async (req, res) => {
       // else stays 'SUBMITTED_TO_SUPERVISOR'
     }
 
+    const isGlobalUser = req.user.role === 'admin' || req.user.isHeadOffice === true;
+    const userDistrictName = req.user.districtName;
+
+    // District users can ONLY create petitions for their assigned district
+    let targetDistrict = data.district;
+    if (!isGlobalUser) {
+      if (!userDistrictName) {
+        return res.status(403).json({ error: 'Access denied: User is not assigned to any district' });
+      }
+      targetDistrict = userDistrictName;
+    }
+
     const newPetition = await prisma.petition.create({
       data: {
-        district: data.district,
+        district: targetDistrict,
         petitionNo: data.petitionNo,
         petitionerName: data.petitionerName,
         petitionerAddress: data.petitionerAddress || null,
@@ -352,6 +367,14 @@ router.get('/:id', async (req, res) => {
     });
 
     if (!petition) return res.status(404).json({ error: 'Petition not found' });
+
+    const isGlobalUser = req.user.role === 'admin' || req.user.isHeadOffice === true;
+    if (!isGlobalUser && req.user.districtName) {
+      if (petition.district?.toLowerCase() !== req.user.districtName.toLowerCase()) {
+        return res.status(403).json({ error: 'Access denied: This petition belongs to another district' });
+      }
+    }
+
     res.json(petition);
   } catch (error) {
     console.error('Fetch petition error:', error);
@@ -371,6 +394,13 @@ router.post('/:id/action', async (req, res) => {
     });
     
     if (!petition) return res.status(404).json({ error: 'Petition not found' });
+
+    const isGlobalUser = req.user.role === 'admin' || req.user.isHeadOffice === true;
+    if (!isGlobalUser && req.user.districtName) {
+      if (petition.district?.toLowerCase() !== req.user.districtName.toLowerCase()) {
+        return res.status(403).json({ error: 'Access denied: You cannot take action on petitions from another district' });
+      }
+    }
 
     const isCreator = petition.createdById === req.user.userId;
     const isSupervisor = petition.createdBy?.supervisorUserId === req.user.userId;

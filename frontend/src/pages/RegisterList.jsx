@@ -6,7 +6,7 @@ import {
   FileText, Calendar, Users, MessageSquare, MapPin, CheckCircle2,
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronDown, ChevronUp,
   AlertCircle, Clock, Gavel, Shield, Building2, SlidersHorizontal, FileDown,
-  Settings2, ArrowUpDown, Filter, RotateCcw, Maximize2, Minimize2, Check, Sparkles
+  Settings2, ArrowUpDown, Filter, RotateCcw, Check, Sparkles
 } from 'lucide-react';
 import { exportPetitionsToExcel } from '../lib/exportExcel';
 import { exportPetitionToPdf } from '../lib/exportPdf';
@@ -40,7 +40,7 @@ export default function RegisterList() {
   const [pageSize, setPageSize] = useState(25);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [districtFilter, setDistrictFilter] = useState('');
+  const [districtFilter, setDistrictFilter] = useState(localStorage.getItem('role') !== 'admin' && localStorage.getItem('isHeadOffice') !== '1' ? (localStorage.getItem('districtName') || '') : '');
   const [statusFilter, setStatusFilter] = useState('');
   const [proposalFilter, setProposalFilter] = useState('');
   const [permissionFilter, setPermissionFilter] = useState('');
@@ -61,6 +61,9 @@ export default function RegisterList() {
 
   const currentUserId = localStorage.getItem('userId');
   const role = localStorage.getItem('role');
+  const isHeadOffice = localStorage.getItem('isHeadOffice') === '1';
+  const userDistrictName = localStorage.getItem('districtName') || '';
+  const isGlobalUser = role === 'admin' || isHeadOffice;
   const searchDebounceRef = useRef(null);
   const tableContainerRef = useRef(null);
   const topScrollRef = useRef(null);
@@ -475,13 +478,20 @@ export default function RegisterList() {
           )}
         </div>
 
-        <SearchableSelect
-          className="w-auto min-w-[170px]"
-          value={districtFilter}
-          onChange={v => setDistrictFilter(v)}
-          options={[{ value: '', label: 'All Districts' }, ...activeDistricts.map(d => ({ value: d, label: d }))]}
-          label="Filter by District"
-        />
+        {!isGlobalUser && userDistrictName ? (
+          <span className="font-mono text-xs font-bold text-[#000E89] bg-[#E8EEF9] border border-[#CBD8EF] px-3 py-2 rounded-lg shadow-2xs inline-flex items-center gap-1.5 flex-shrink-0">
+            <MapPin className="w-3.5 h-3.5 text-brass" />
+            {userDistrictName}
+          </span>
+        ) : (
+          <SearchableSelect
+            className="w-auto min-w-[170px]"
+            value={districtFilter}
+            onChange={v => setDistrictFilter(v)}
+            options={[{ value: '', label: 'All Districts' }, ...activeDistricts.map(d => ({ value: d, label: d }))]}
+            label="Filter by District"
+          />
+        )}
 
         <select
           className="app-input w-auto min-w-[150px]"
@@ -495,22 +505,6 @@ export default function RegisterList() {
           <option value="Recommended to DE">Recommended to DE</option>
           <option value="Close">Close</option>
         </select>
-
-        <SearchableSelect
-          className="w-auto min-w-[190px]"
-          value={officerFilter}
-          onChange={v => setOfficerFilter(v)}
-          options={[
-            { value: '', label: 'All Officers' },
-            ...availableOfficers.map(o => ({
-              value: o.name,
-              label: `${o.name} (${o.designation || o.role})`
-            }))
-          ]}
-          label="Filter by Officer"
-          placeholder="All Officers"
-          searchPlaceholder="Search officer name or designation…"
-        />
 
         {/* Advanced Filters Toggle Button */}
         <button
@@ -530,17 +524,6 @@ export default function RegisterList() {
               {activeFilters.length}
             </span>
           )}
-        </button>
-
-        {/* Density Toggle Button */}
-        <button
-          type="button"
-          onClick={() => setTableDensity(d => d === 'comfortable' ? 'compact' : 'comfortable')}
-          className="btn btn-secondary py-2 px-3 text-[12.5px] hidden sm:inline-flex items-center gap-1.5"
-          title={tableDensity === 'comfortable' ? 'Switch to compact view' : 'Switch to comfortable view'}
-        >
-          {tableDensity === 'comfortable' ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
-          <span>{tableDensity === 'comfortable' ? 'Compact' : 'Spacious'}</span>
         </button>
 
         {/* Expand / Collapse All Respondents Button */}

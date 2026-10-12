@@ -84,7 +84,23 @@ router.post('/', async (req, res) => {
     if (!email || !password || !fullName || !kgidNumber || !designationId || !supervisorDesignationId) {
       return res.status(400).json({ error: 'Missing mandatory fields' });
     }
-    if (!isHeadOffice && !districtId) {
+
+    let finalDistrictId = districtId;
+    let finalIsHeadOffice = !!isHeadOffice;
+    if (designationId) {
+      const desig = await prisma.designation.findUnique({ where: { id: designationId } });
+      if (desig) {
+        if (desig.districtId) {
+          finalDistrictId = desig.districtId;
+          finalIsHeadOffice = false;
+        } else {
+          finalDistrictId = null;
+          finalIsHeadOffice = true;
+        }
+      }
+    }
+
+    if (!finalIsHeadOffice && !finalDistrictId) {
       return res.status(400).json({ error: 'District is required for non-head office users' });
     }
     
@@ -131,10 +147,10 @@ router.post('/', async (req, res) => {
         designationId,
         supervisorDesignationId,
         supervisorUserId: supervisorUserId || null,
-        districtId: isHeadOffice ? null : districtId,
+        districtId: finalIsHeadOffice ? null : finalDistrictId,
         role: normalizeRole(role),
         isActive: isActive !== false,
-        isHeadOffice: !!isHeadOffice
+        isHeadOffice: finalIsHeadOffice
       },
       select: userSelect
     });
@@ -159,7 +175,23 @@ router.put('/:id', async (req, res) => {
     if (!email || !fullName || !kgidNumber || !designationId || !supervisorDesignationId) {
       return res.status(400).json({ error: 'Missing mandatory fields' });
     }
-    if (!isHeadOffice && !districtId) {
+
+    let finalDistrictId = districtId;
+    let finalIsHeadOffice = !!isHeadOffice;
+    if (designationId) {
+      const desig = await prisma.designation.findUnique({ where: { id: designationId } });
+      if (desig) {
+        if (desig.districtId) {
+          finalDistrictId = desig.districtId;
+          finalIsHeadOffice = false;
+        } else {
+          finalDistrictId = null;
+          finalIsHeadOffice = true;
+        }
+      }
+    }
+
+    if (!finalIsHeadOffice && !finalDistrictId) {
       return res.status(400).json({ error: 'District is required for non-head office users' });
     }
 
@@ -187,10 +219,10 @@ router.put('/:id', async (req, res) => {
       designationId,
       supervisorDesignationId,
       supervisorUserId: supervisorUserId || null,
-      districtId: isHeadOffice ? null : districtId,
+      districtId: finalIsHeadOffice ? null : finalDistrictId,
       role: normalizeRole(role),
       isActive: isActive !== false,
-      isHeadOffice: !!isHeadOffice
+      isHeadOffice: finalIsHeadOffice
     };
 
     if (password) {

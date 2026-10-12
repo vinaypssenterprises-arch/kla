@@ -268,13 +268,39 @@ export default function UserManagement() {
     editingUser && editingUser.districtId && !districts.find(d => d.id === editingUser.districtId) ? editingUser.districtId : null,
     editingUser?.district?.name
   );
+  // Sort designations smartly:
+  // If a district is chosen, put that district's designations and state-wide designations at top
+  const sortedDesignations = useMemo(() => {
+    return [...designations].sort((a, b) => {
+      if (form.districtId) {
+        const aMatches = a.districtId === form.districtId;
+        const bMatches = b.districtId === form.districtId;
+        if (aMatches && !bMatches) return -1;
+        if (!aMatches && bMatches) return 1;
+      }
+      if (form.isHeadOffice) {
+        const aIsHO = !a.districtId;
+        const bIsHO = !b.districtId;
+        if (aIsHO && !bIsHO) return -1;
+        if (!aIsHO && bIsHO) return 1;
+      }
+      return (a.name || '').localeCompare(b.name || '');
+    });
+  }, [designations, form.districtId, form.isHeadOffice]);
+
   const designationOptions = withLegacyOption(
-    designations.map(d => ({ value: d.id, label: d.district?.name ? `${d.name} (${d.district.name})` : d.name })),
+    sortedDesignations.map(d => ({
+      value: d.id,
+      label: d.district?.name ? `${d.name} (${d.district.name})` : `★ ${d.name} (All Districts / Head Office)`
+    })),
     editingUser && editingUser.designationId && !designations.find(d => d.id === editingUser.designationId) ? editingUser.designationId : null,
     editingUser?.designation?.name
   );
   const supervisorDesignationOptions = withLegacyOption(
-    designations.map(d => ({ value: d.id, label: d.district?.name ? `${d.name} (${d.district.name})` : d.name })),
+    sortedDesignations.map(d => ({
+      value: d.id,
+      label: d.district?.name ? `${d.name} (${d.district.name})` : `★ ${d.name} (All Districts / Head Office)`
+    })),
     editingUser && editingUser.supervisorDesignationId && !designations.find(d => d.id === editingUser.supervisorDesignationId) ? editingUser.supervisorDesignationId : null,
     editingUser?.supervisorDesignation?.name
   );
@@ -883,7 +909,18 @@ export default function UserManagement() {
                     </label>
                     <SearchableSelect
                       value={form.districtId}
-                      onChange={v => setForm({ ...form, districtId: v })}
+                      onChange={v => {
+                        setForm(prev => {
+                          const currentDesig = designations.find(d => d.id === prev.designationId);
+                          const shouldKeepDesig = currentDesig && (currentDesig.districtId === v || !currentDesig.districtId);
+                          return {
+                            ...prev,
+                            districtId: v,
+                            isHeadOffice: false,
+                            designationId: shouldKeepDesig ? prev.designationId : ''
+                          };
+                        });
+                      }}
                       options={districtOptions}
                       label="Select District"
                       placeholder="Search and select district jurisdiction..."
@@ -906,7 +943,28 @@ export default function UserManagement() {
                   </label>
                   <SearchableSelect
                     value={form.designationId}
-                    onChange={v => setForm({ ...form, designationId: v })}
+                    onChange={v => {
+                      const desig = designations.find(d => d.id === v);
+                      if (desig) {
+                        if (desig.districtId) {
+                          setForm(prev => ({
+                            ...prev,
+                            designationId: v,
+                            districtId: desig.districtId,
+                            isHeadOffice: false
+                          }));
+                        } else {
+                          setForm(prev => ({
+                            ...prev,
+                            designationId: v,
+                            districtId: '',
+                            isHeadOffice: true
+                          }));
+                        }
+                      } else {
+                        setForm(prev => ({ ...prev, designationId: v }));
+                      }
+                    }}
                     options={designationOptions}
                     label="Select Designation"
                     placeholder="Select designation..."
