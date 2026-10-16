@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const prisma = require('../prismaClient');
+const redisClient = require('../redisClient');
 const { authMiddleware, adminMiddleware } = require('./auth');
 
 const CATEGORIES = ['taluk', 'policeStation', 'department', 'subDepartment', 'peStatus', 'proposalStatus'];
@@ -14,13 +15,19 @@ const checkCategory = (req, res, next) => {
   next();
 };
 
-// List items for a category
+// List items for a category (cached for fast response)
 router.get('/:category', checkCategory, async (req, res) => {
   try {
+    const cacheKey = `master-items:${req.params.category}`;
+    const cached = await redisClient.get(cacheKey);
+    if (cached) return res.json(JSON.parse(cached));
+
     const items = await prisma.masterItem.findMany({
       where: { category: req.params.category },
       orderBy: { name: 'asc' }
     });
+
+    await redisClient.setEx(cacheKey, 300, JSON.stringify(items));
     res.json(items);
   } catch (error) {
     console.error('Fetch master items error:', error);
@@ -44,6 +51,8 @@ router.post('/:category', checkCategory, adminMiddleware, async (req, res) => {
     const item = await prisma.masterItem.create({
       data: { category: req.params.category, name: name.trim(), parentId: parentId || null }
     });
+
+    await redisClient.del(`master-items:${req.params.category}`);
     res.status(201).json(item);
   } catch (error) {
     console.error('Create master item error:', error);
@@ -63,6 +72,8 @@ router.put('/:category/:id', checkCategory, adminMiddleware, async (req, res) =>
       where: { id: req.params.id },
       data: { name: name.trim(), isActive: isActive !== false, parentId: parentId !== undefined ? parentId : undefined }
     });
+
+    await redisClient.del(`master-items:${req.params.category}`);
     res.json(item);
   } catch (error) {
     if (error.code === 'P2025') return res.status(404).json({ error: 'Item not found' });
@@ -76,6 +87,7 @@ router.put('/:category/:id', checkCategory, adminMiddleware, async (req, res) =>
 router.delete('/:category/:id', checkCategory, adminMiddleware, async (req, res) => {
   try {
     await prisma.masterItem.delete({ where: { id: req.params.id } });
+    await redisClient.del(`master-items:${req.params.category}`);
     res.status(204).send();
   } catch (error) {
     if (error.code === 'P2025') return res.status(404).json({ error: 'Item not found' });

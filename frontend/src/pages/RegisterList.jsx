@@ -1,6 +1,6 @@
 import { apiFetch } from '../lib/api';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Search, Plus, ArchiveX, Eye, Pencil, Trash2, X, Download,
   FileText, Calendar, Users, MessageSquare, MapPin, CheckCircle2,
@@ -19,6 +19,7 @@ const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 
 export default function RegisterList() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [entries, setEntries] = useState([]);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
@@ -38,9 +39,20 @@ export default function RegisterList() {
   // Pagination & filters
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [districtFilter, setDistrictFilter] = useState(localStorage.getItem('role') !== 'admin' && localStorage.getItem('isHeadOffice') !== '1' ? (localStorage.getItem('districtName') || '') : '');
+  const [searchQuery, setSearchQuery] = useState(() => {
+    const p = new URLSearchParams(window.location.search);
+    return p.get('search') || '';
+  });
+  const [debouncedSearch, setDebouncedSearch] = useState(() => {
+    const p = new URLSearchParams(window.location.search);
+    return p.get('search') || '';
+  });
+  const [districtFilter, setDistrictFilter] = useState(() => {
+    const p = new URLSearchParams(window.location.search);
+    const d = p.get('district');
+    if (d) return d;
+    return localStorage.getItem('role') !== 'admin' && localStorage.getItem('isHeadOffice') !== '1' ? (localStorage.getItem('districtName') || '') : '';
+  });
   const [statusFilter, setStatusFilter] = useState('');
   const [proposalFilter, setProposalFilter] = useState('');
   const [permissionFilter, setPermissionFilter] = useState('');
@@ -119,6 +131,22 @@ export default function RegisterList() {
     }, 350);
     return () => clearTimeout(searchDebounceRef.current);
   }, [searchQuery]);
+
+  // Sync state when location.search changes (e.g. navigation from reports or quick links)
+  useEffect(() => {
+    const p = new URLSearchParams(location.search);
+    const q = p.get('search');
+    const d = p.get('district');
+    if (q !== null && q !== searchQuery) {
+      setSearchQuery(q);
+      setDebouncedSearch(q);
+      setPage(1);
+    }
+    if (d !== null && d !== districtFilter) {
+      setDistrictFilter(d);
+      setPage(1);
+    }
+  }, [location.search]);
 
   // Reset to page 1 when any filter changes
   useEffect(() => {
@@ -396,62 +424,105 @@ export default function RegisterList() {
 
   return (
     <div style={{ animation: 'fadeSlideIn 0.3s ease-out' }}>
-      {/* Page Header */}
-      <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
-        <div>
-          <h2 className="text-[22px] font-serif font-bold text-ink-text tracking-tight">17-A Proposals & Status Register</h2>
-          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[12px] font-bold bg-[#EAE4D2] text-[#4A3E25] border border-[#D5CCA8]/80 shadow-2xs">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#A97B33]" />
-              {total.toLocaleString()} {total === 1 ? 'total record' : 'total records'}
-            </span>
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[12px] font-bold bg-[#000E89]/10 text-[#000E89] border border-[#CBD8EF] font-mono shadow-2xs">
-              Page {page} of {Math.max(1, totalPages)}
-            </span>
-            {total > 0 && (
-              <span className="text-[12px] text-ink-text-soft font-medium">
-                • Showing {startEntry}–{endEntry}
+      {/* Page Header with Grand Blinking Live Records Counter */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-5 gap-4 bg-[#FFFDF7] p-4 sm:p-5 rounded-2xl border border-[#D5CCA8] shadow-sm">
+        <div className="flex items-start sm:items-center gap-3.5 flex-wrap">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#0000FE] to-[#0000C8] flex-shrink-0 flex items-center justify-center shadow-md border border-yellow-300/60">
+            <Shield className="w-6 h-6 text-yellow-300" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
+              <span className="text-[10px] uppercase tracking-widest font-semibold px-2 py-0.5 rounded bg-maroon/10 text-maroon border border-maroon/20">
+                Karnataka Lokayukta
               </span>
-            )}
-            {activeFilters.length > 0 && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs">
-                Filtered view ({activeFilters.length})
+              <span className="text-[10px] uppercase tracking-wider font-mono text-ink-text-soft bg-[#EAE4D2] px-2 py-0.5 rounded border border-[#D5CCA8]/60">
+                Sec. 17-A Vigilance Docket
               </span>
-            )}
+            </div>
+            <h2 className="text-[22px] sm:text-[24px] font-serif font-bold text-ink-text tracking-tight leading-tight">
+              17-A Proposals & Status Register
+            </h2>
+            <div className="flex items-center gap-2 mt-1.5 flex-wrap text-xs">
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-bold bg-[#000E89]/10 text-[#000E89] border border-[#CBD8EF] font-mono shadow-2xs">
+                Page {page} of {Math.max(1, totalPages)}
+              </span>
+              {total > 0 && (
+                <span className="text-ink-text-soft font-medium">
+                  • Showing {startEntry}–{endEntry}
+                </span>
+              )}
+              {activeFilters.length > 0 && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-semibold bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs">
+                  Filtered view ({activeFilters.length})
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5 flex-wrap">
-          {totalPages > 1 && (
-            <div className="hidden sm:inline-flex items-center gap-1 bg-[#FFFDF7] border border-[#D5CCA8] px-2 py-1 rounded-lg shadow-2xs">
-              <button
-                type="button"
-                onClick={() => goToPage(page - 1)}
-                disabled={page === 1}
-                className="w-6 h-6 flex items-center justify-center rounded hover:bg-[#EAE4D2] text-ink-text disabled:opacity-30 transition-colors"
-                title="Previous page"
-              >
-                <ChevronLeft className="w-3.5 h-3.5" />
-              </button>
-              <span className="text-[12px] font-mono font-bold text-[#000E89] px-1.5">
-                Page {page} / {totalPages}
-              </span>
-              <button
-                type="button"
-                onClick={() => goToPage(page + 1)}
-                disabled={page === totalPages}
-                className="w-6 h-6 flex items-center justify-center rounded hover:bg-[#EAE4D2] text-ink-text disabled:opacity-30 transition-colors"
-                title="Next page"
-              >
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
+        {/* Right: Big Blinking Executive Live Counter & Excel Export */}
+        <div className="flex items-center gap-3 flex-wrap sm:flex-nowrap justify-between lg:justify-end">
+          {/* Big Live Pulsing Count Hero Card */}
+          <div className="flex items-center gap-3.5 bg-gradient-to-br from-white via-[#FAF7EE] to-emerald-50/80 border-2 border-emerald-500/50 rounded-xl px-4 py-2.5 shadow-sm hover:border-emerald-600 transition-all">
+            <div className="relative flex items-center justify-center w-11 h-11 rounded-xl bg-gradient-to-br from-[#000E89] to-[#081868] text-white shadow-xs flex-shrink-0">
+              <FileText className="w-5 h-5 text-amber-300" />
+              {/* Blinking Live Radar Ping */}
+              <span className="animate-ping absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full bg-emerald-400 opacity-75" />
+              <span className="absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full bg-emerald-500 border-2 border-white shadow-xs" />
             </div>
-          )}
+            <div className="flex flex-col">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10.5px] font-bold uppercase tracking-wider text-ink-text-soft font-mono">
+                  Total Petitions
+                </span>
+              </div>
+              <div className="flex items-baseline gap-2 mt-0.5">
+                <span className="text-3xl sm:text-4xl font-black font-mono text-[#000E89] tracking-tight leading-none drop-shadow-2xs">
+                  {total.toLocaleString()}
+                </span>
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-bold text-emerald-800 bg-emerald-100/90 border border-emerald-300 font-mono shadow-2xs animate-pulse">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-600" />
+                  </span>
+                  {total === 1 ? 'Record' : 'Records'}
+                </span>
+              </div>
+            </div>
+          </div>
 
-          <button type="button" className="btn btn-excel no-print shadow-sm" title="Export to Excel" onClick={handleExportExcel}>
-            <Download className="w-[15px] h-[15px]" />
-            Export Excel
-          </button>
+          <div className="flex items-center gap-2">
+            {totalPages > 1 && (
+              <div className="hidden xl:inline-flex items-center gap-1 bg-white border border-[#D5CCA8] px-2 py-1 rounded-lg shadow-2xs">
+                <button
+                  type="button"
+                  onClick={() => goToPage(page - 1)}
+                  disabled={page === 1}
+                  className="w-6 h-6 flex items-center justify-center rounded hover:bg-[#EAE4D2] text-ink-text disabled:opacity-30 transition-colors"
+                  title="Previous page"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                </button>
+                <span className="text-[12px] font-mono font-bold text-[#000E89] px-1.5">
+                  {page} / {totalPages}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => goToPage(page + 1)}
+                  disabled={page === totalPages}
+                  className="w-6 h-6 flex items-center justify-center rounded hover:bg-[#EAE4D2] text-ink-text disabled:opacity-30 transition-colors"
+                  title="Next page"
+                >
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+
+            <button type="button" className="btn btn-excel no-print shadow-sm whitespace-nowrap h-[44px] px-3.5" title="Export to Excel" onClick={handleExportExcel}>
+              <Download className="w-[15px] h-[15px]" />
+              Export Excel
+            </button>
+          </div>
         </div>
       </div>
 
@@ -572,6 +643,10 @@ export default function RegisterList() {
               : 'bg-white/80 hover:bg-[#EAE4D2] text-ink-text border border-[#D5CCA8]'
           }`}
         >
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
+          </span>
           All Petitions
           <span className={`text-[10.5px] px-1.5 py-0.2 rounded-full font-bold ${
             !statusFilter && !proposalFilter && !permissionFilter ? 'bg-white/20 text-white' : 'bg-[#EAE4D2] text-[#4A3E25]'
@@ -1100,7 +1175,7 @@ export default function RegisterList() {
               <thead>
                 <tr>
                   <th className="w-[54px] min-w-[54px] text-center">Case #</th>
-                  <th className="w-[52px] min-w-[52px] text-center">Action</th>
+                  <th className="w-[50px] min-w-[48px] text-center">Action</th>
                   <th className="w-[130px] min-w-[120px]">District</th>
                   <th className="w-[160px] min-w-[150px]">Petition No.</th>
                   <th className="w-[160px] min-w-[140px]">Petitioner</th>
@@ -1143,20 +1218,34 @@ export default function RegisterList() {
                           </div>
                         </td>
 
-                        {/* Actions (placed immediately after Case # / SL No) */}
-                        <td onClick={e => e.stopPropagation()} className={`text-center px-1.5 align-middle ${tableDensity === 'compact' ? 'py-1' : 'py-2'}`}>
-                          <button
-                            type="button"
-                            className={`w-7 h-7 rounded-lg inline-flex items-center justify-center transition-all border ${
-                              actionMenu?.id === entry.id
-                                ? 'bg-[#000E89] text-white border-[#000E89] shadow-xs'
-                                : 'bg-[#F4F7FC] hover:bg-[#000E89] text-[#000E89] hover:text-white border-[#CBD8EF]'
-                            }`}
-                            title="Manage Case"
-                            onClick={(e) => handleToggleActionMenu(e, entry)}
-                          >
-                            <Settings2 className="w-3.5 h-3.5" />
-                          </button>
+                        {/* Actions (Manage Menu & Summary Download Symbol Button - Stacked Vertically) */}
+                        <td onClick={e => e.stopPropagation()} className={`text-center px-1 align-middle whitespace-nowrap ${tableDensity === 'compact' ? 'py-1' : 'py-1.5'}`}>
+                          <div className="flex flex-col items-center justify-center gap-1">
+                            <button
+                              type="button"
+                              className={`w-7 h-7 rounded-lg inline-flex items-center justify-center transition-all border ${
+                                actionMenu?.id === entry.id
+                                  ? 'bg-[#000E89] text-white border-[#000E89] shadow-xs'
+                                  : 'bg-[#F4F7FC] hover:bg-[#000E89] text-[#000E89] hover:text-white border-[#CBD8EF]'
+                              }`}
+                              title="Manage Case (View, Edit, Delete)"
+                              onClick={(e) => handleToggleActionMenu(e, entry)}
+                            >
+                              <Settings2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                exportPetitionToPdf(entry);
+                                showSuccess(`Downloading summary for ${entry.petitionNo}…`);
+                              }}
+                              className="w-7 h-7 rounded-lg inline-flex items-center justify-center transition-all border border-emerald-300 hover:border-emerald-600 bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white shadow-2xs hover:shadow-xs active:scale-90 cursor-pointer group/dl"
+                              title={`Summary Download (PDF) - ${entry.petitionNo}`}
+                            >
+                              <FileDown className="w-3.5 h-3.5 transition-transform group-hover/dl:scale-115" />
+                            </button>
+                          </div>
                         </td>
 
                         {/* District */}
@@ -1476,11 +1565,11 @@ export default function RegisterList() {
                 const entry = actionMenu.entry;
                 setActionMenu(null);
                 exportPetitionToPdf(entry);
-                showSuccess(`Downloading PDF for ${entry.petitionNo}…`);
+                showSuccess(`Downloading summary for ${entry.petitionNo}…`);
               }}
             >
               <FileDown className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-              <span>Download PDF Dossier</span>
+              <span>Summary Download</span>
             </button>
             {(role === 'admin' || actionMenu.entry.createdById === currentUserId || actionMenu.entry.createdBy?.supervisorUserId === currentUserId) && (
               <>
@@ -1564,12 +1653,12 @@ export default function RegisterList() {
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#C9A15E] hover:bg-[#b58e4e] text-[#000E89] text-[12px] font-bold shadow-md transition-all active:scale-95 cursor-pointer"
                     onClick={() => {
                       exportPetitionToPdf(viewingEntry);
-                      showSuccess(`Downloading PDF for ${viewingEntry.petitionNo}…`);
+                      showSuccess(`Downloading summary for ${viewingEntry.petitionNo}…`);
                     }}
-                    title="Download Case PDF Dossier"
+                    title="Download Summary Dossier PDF"
                   >
                     <FileDown className="w-3.5 h-3.5" />
-                    <span>Download PDF</span>
+                    <span>Summary Download</span>
                   </button>
                   <button
                     type="button"

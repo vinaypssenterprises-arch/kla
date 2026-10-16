@@ -1,4 +1,4 @@
-const prisma = require('./prismaClient');
+const prisma = require('../prismaClient');
 
 const rawTable = `
 | Bangalore   city-1 | Superintendent   of Police Bangalore City 1           | Mahanteshwara S   Jiddi         |

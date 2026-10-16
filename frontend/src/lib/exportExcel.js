@@ -1,5 +1,4 @@
 import { apiFetch } from '../lib/api';
-import * as XLSX from 'xlsx';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 
@@ -1006,12 +1005,23 @@ export async function exportDistrictProposalsStatisticsExcel({
   const headerFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2F2F2' } };
   const totalFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEAECEF' } };
 
+  const PE_STATUS_COLUMNS = [
+    'Registered FIR',
+    'Register FIR',
+    'PE Pending',
+    'Recommended to DE',
+    'Close',
+    'High Court Stay'
+  ];
+
   const numHist = historicalYears.length;
   const startHistCol = 3; // Column C
   const endHistCol = startHistCol + numHist - 1;
   const startFocusCol = endHistCol + 1;
-  const endFocusCol = startFocusCol + 5;
-  const totalCols = endFocusCol;
+  const endFocusCol = startFocusCol + 4; // 5 columns: Total Rec, Not Sent, Sent, Back to Dist, Pending CA
+  const startPeCol = endFocusCol + 1;
+  const endPeCol = startPeCol + PE_STATUS_COLUMNS.length - 1; // 6 columns
+  const totalCols = endPeCol;
 
   // Set Column Widths
   sheet.getColumn(1).width = 8;
@@ -1021,10 +1031,16 @@ export async function exportDistrictProposalsStatisticsExcel({
   }
   sheet.getColumn(startFocusCol).width = 16;
   sheet.getColumn(startFocusCol + 1).width = 15;
-  sheet.getColumn(startFocusCol + 2).width = 17;
-  sheet.getColumn(startFocusCol + 3).width = 11;
-  sheet.getColumn(startFocusCol + 4).width = 11;
-  sheet.getColumn(startFocusCol + 5).width = 15;
+  sheet.getColumn(startFocusCol + 2).width = 15;
+  sheet.getColumn(startFocusCol + 3).width = 16;
+  sheet.getColumn(startFocusCol + 4).width = 15;
+
+  sheet.getColumn(startPeCol).width = 16;
+  sheet.getColumn(startPeCol + 1).width = 15;
+  sheet.getColumn(startPeCol + 2).width = 15;
+  sheet.getColumn(startPeCol + 3).width = 18;
+  sheet.getColumn(startPeCol + 4).width = 12;
+  sheet.getColumn(startPeCol + 5).width = 16;
 
   // Row 1: Merged Group Headers
   // Merge Sl. No (A1:A2)
@@ -1053,13 +1069,21 @@ export async function exportDistrictProposalsStatisticsExcel({
   cellHistGroup.font = { name: 'Arial', size: 10, bold: true };
   cellHistGroup.fill = headerFill;
 
-  // Merge Focus Year (e.g. 2026) (startFocusCol to endFocusCol)
+  // Merge CA Dispatch & Status (startFocusCol to endFocusCol)
   sheet.mergeCells(1, startFocusCol, 1, endFocusCol);
   const cellFocusGroup = sheet.getCell(1, startFocusCol);
-  cellFocusGroup.value = isAll ? 'Cumulative Status & Action (All Years)' : `${focusYear} Status & Action`;
+  cellFocusGroup.value = isAll ? 'CA Proposals & Dispatch Status' : `${focusYear} CA Proposals & Dispatch`;
   cellFocusGroup.alignment = { horizontal: 'center', vertical: 'middle' };
   cellFocusGroup.font = { name: 'Arial', size: 10, bold: true };
   cellFocusGroup.fill = headerFill;
+
+  // Merge Preliminary Enquiry (PE) Status (startPeCol to endPeCol)
+  sheet.mergeCells(1, startPeCol, 1, endPeCol);
+  const cellPeGroup = sheet.getCell(1, startPeCol);
+  cellPeGroup.value = 'Preliminary Enquiry (PE) Status';
+  cellPeGroup.alignment = { horizontal: 'center', vertical: 'middle' };
+  cellPeGroup.font = { name: 'Arial', size: 10, bold: true };
+  cellPeGroup.fill = headerFill;
 
   // Row 2: Sub-headers
   historicalYears.forEach((y, i) => {
@@ -1072,11 +1096,11 @@ export async function exportDistrictProposalsStatisticsExcel({
 
   const focusHeaders = [
     'Total Proposals Received at HQ',
+    'Not Sent to CA',
     'Proposals Sent to CA',
     'Proposals sent back to Dist',
-    'Obtained',
-    'Rejected',
-    'Pending with CA'
+    'Pending with CA',
+    ...PE_STATUS_COLUMNS
   ];
 
   focusHeaders.forEach((title, i) => {
@@ -1115,11 +1139,16 @@ export async function exportDistrictProposalsStatisticsExcel({
 
     const fVals = [
       d.totalReceivedAtHq,
+      d.notSentToCA,
       d.proposalsSentToCA,
       d.proposalsSentBackToDist,
-      d.obtained,
-      d.rejected,
-      d.pendingWithCA
+      d.pendingWithCA,
+      d.peBreakdown?.['Registered FIR'],
+      d.peBreakdown?.['Register FIR'],
+      d.peBreakdown?.['PE Pending'],
+      d.peBreakdown?.['Recommended to DE'],
+      d.peBreakdown?.['Close'],
+      d.peBreakdown?.['High Court Stay']
     ];
 
     fVals.forEach((val, i) => {
@@ -1157,11 +1186,16 @@ export async function exportDistrictProposalsStatisticsExcel({
 
   const totFocusVals = [
     totals.totalReceivedAtHq || 0,
+    totals.notSentToCA || 0,
     totals.proposalsSentToCA || 0,
     totals.proposalsSentBackToDist || 0,
-    totals.obtained || 0,
-    totals.rejected || 0,
-    totals.pendingWithCA || 0
+    totals.pendingWithCA || 0,
+    totals.peBreakdown?.['Registered FIR'] || 0,
+    totals.peBreakdown?.['Register FIR'] || 0,
+    totals.peBreakdown?.['PE Pending'] || 0,
+    totals.peBreakdown?.['Recommended to DE'] || 0,
+    totals.peBreakdown?.['Close'] || 0,
+    totals.peBreakdown?.['High Court Stay'] || 0
   ];
 
   totFocusVals.forEach((val, i) => {
@@ -1186,5 +1220,258 @@ export async function exportDistrictProposalsStatisticsExcel({
   const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const cleanYear = isAll ? 'All_Years' : String(focusYear).replace(/[^a-zA-Z0-9_-]/g, '_');
   const fileName = `17-A_District_Proposals_Statistics_${cleanYear}.xlsx`;
+  saveAs(blob, fileName);
+}
+
+export async function exportDistrictRespondentsStatisticsExcel({
+  districtStats = [],
+  totals = {},
+  historicalYears = [],
+  focusYear = 2026,
+  isAllYears = false
+} = {}) {
+  const isAll = Boolean(isAllYears || focusYear === 'ALL' || String(focusYear).toLowerCase().includes('all'));
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = 'Karnataka Lokayukta Police';
+  workbook.created = new Date();
+
+  const sheet = workbook.addWorksheet('Respondents Statistics', {
+    pageSetup: {
+      paperSize: 9, // A4
+      orientation: 'landscape',
+      fitToPage: true,
+      fitToWidth: 1,
+      fitToHeight: 0,
+      margins: { left: 0.4, right: 0.4, top: 0.6, bottom: 0.6, header: 0.3, footer: 0.3 }
+    }
+  });
+
+  const borderStyle = {
+    top: { style: 'thin', color: { argb: 'FF000000' } },
+    left: { style: 'thin', color: { argb: 'FF000000' } },
+    bottom: { style: 'thin', color: { argb: 'FF000000' } },
+    right: { style: 'thin', color: { argb: 'FF000000' } }
+  };
+
+  const headerFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2F2F2' } };
+  const totalFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEAECEF' } };
+
+  const PE_STATUS_COLUMNS = [
+    'Registered FIR',
+    'Register FIR',
+    'PE Pending',
+    'Recommended to DE',
+    'Close',
+    'High Court Stay'
+  ];
+
+  const numHist = historicalYears.length;
+  const startHistCol = 3; // Column C
+  const endHistCol = startHistCol + numHist - 1;
+  const startFocusCol = endHistCol + 1;
+  const endFocusCol = startFocusCol + 6; // 7 columns: Total, Not Sent, Sent, Back to Dist, Pending CA, Obtained, Rejected
+  const startPeCol = endFocusCol + 1;
+  const endPeCol = startPeCol + PE_STATUS_COLUMNS.length - 1; // 6 columns
+  const totalCols = endPeCol;
+
+  // Set Column Widths
+  sheet.getColumn(1).width = 8;
+  sheet.getColumn(2).width = 24;
+  for (let i = 0; i < numHist; i++) {
+    sheet.getColumn(startHistCol + i).width = 8;
+  }
+  sheet.getColumn(startFocusCol).width = 16;
+  sheet.getColumn(startFocusCol + 1).width = 15;
+  sheet.getColumn(startFocusCol + 2).width = 15;
+  sheet.getColumn(startFocusCol + 3).width = 16;
+  sheet.getColumn(startFocusCol + 4).width = 15;
+  sheet.getColumn(startFocusCol + 5).width = 16;
+  sheet.getColumn(startFocusCol + 6).width = 16;
+
+  sheet.getColumn(startPeCol).width = 16;
+  sheet.getColumn(startPeCol + 1).width = 15;
+  sheet.getColumn(startPeCol + 2).width = 15;
+  sheet.getColumn(startPeCol + 3).width = 18;
+  sheet.getColumn(startPeCol + 4).width = 12;
+  sheet.getColumn(startPeCol + 5).width = 16;
+
+  // Row 1: Merged Group Headers
+  sheet.mergeCells(1, 1, 2, 1);
+  const cellA1 = sheet.getCell(1, 1);
+  cellA1.value = 'Sl. No';
+  cellA1.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+  cellA1.font = { name: 'Arial', size: 10, bold: true };
+  cellA1.fill = headerFill;
+
+  sheet.mergeCells(1, 2, 2, 2);
+  const cellB1 = sheet.getCell(1, 2);
+  cellB1.value = 'Dist';
+  cellB1.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+  cellB1.font = { name: 'Arial', size: 10, bold: true };
+  cellB1.fill = headerFill;
+
+  sheet.mergeCells(1, startHistCol, 1, endHistCol);
+  const cellHistGroup = sheet.getCell(1, startHistCol);
+  cellHistGroup.value = isAll
+    ? (historicalYears.length > 0 ? `Respondents by Year (${historicalYears[0]} - ${historicalYears[historicalYears.length - 1]})` : 'Respondents by Year')
+    : (historicalYears.length > 0 ? `Respondents (${historicalYears[0]} - ${historicalYears[historicalYears.length - 1]})` : 'Respondents');
+  cellHistGroup.alignment = { horizontal: 'center', vertical: 'middle' };
+  cellHistGroup.font = { name: 'Arial', size: 10, bold: true };
+  cellHistGroup.fill = headerFill;
+
+  sheet.mergeCells(1, startFocusCol, 1, endFocusCol);
+  const cellFocusGroup = sheet.getCell(1, startFocusCol);
+  cellFocusGroup.value = isAll ? 'CA Sanction Status (Per Respondent)' : `${focusYear} CA Sanction Status (Per Respondent)`;
+  cellFocusGroup.alignment = { horizontal: 'center', vertical: 'middle' };
+  cellFocusGroup.font = { name: 'Arial', size: 10, bold: true };
+  cellFocusGroup.fill = headerFill;
+
+  sheet.mergeCells(1, startPeCol, 1, endPeCol);
+  const cellPeGroup = sheet.getCell(1, startPeCol);
+  cellPeGroup.value = 'Preliminary Enquiry (PE) Status';
+  cellPeGroup.alignment = { horizontal: 'center', vertical: 'middle' };
+  cellPeGroup.font = { name: 'Arial', size: 10, bold: true };
+  cellPeGroup.fill = headerFill;
+
+  // Row 2: Sub-headers
+  historicalYears.forEach((y, i) => {
+    const cell = sheet.getCell(2, startHistCol + i);
+    cell.value = y;
+    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+    cell.font = { name: 'Arial', size: 10, bold: true };
+    cell.fill = headerFill;
+  });
+
+  const focusHeaders = [
+    'Total Respondents',
+    'Not Sent to CA',
+    'Sent to CA',
+    'Back to Dist',
+    'Pending CA',
+    'Obtained',
+    'Rejected',
+    ...PE_STATUS_COLUMNS
+  ];
+
+  focusHeaders.forEach((title, i) => {
+    const cell = sheet.getCell(2, startFocusCol + i);
+    cell.value = title;
+    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+    cell.font = { name: 'Arial', size: 10, bold: true };
+    cell.fill = headerFill;
+  });
+
+  sheet.getRow(1).height = 24;
+  sheet.getRow(2).height = 42;
+
+  for (let r = 1; r <= 2; r++) {
+    for (let c = 1; c <= totalCols; c++) {
+      sheet.getCell(r, c).border = borderStyle;
+    }
+  }
+
+  // Row 3 onwards: Data rows
+  let curRow = 3;
+  districtStats.forEach(d => {
+    sheet.getCell(curRow, 1).value = d.slNo;
+    sheet.getCell(curRow, 1).alignment = { horizontal: 'center', vertical: 'middle' };
+
+    sheet.getCell(curRow, 2).value = d.district;
+    sheet.getCell(curRow, 2).alignment = { horizontal: 'left', vertical: 'middle' };
+
+    historicalYears.forEach((y, i) => {
+      const val = d.historical ? (d.historical[y] || 0) : 0;
+      const cell = sheet.getCell(curRow, startHistCol + i);
+      cell.value = val === 0 ? '' : val;
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+    });
+
+    const fVals = [
+      d.totalRespondents,
+      d.notSentToCA,
+      d.sentToCA,
+      d.backToDist,
+      d.pendingWithCA,
+      d.obtained,
+      d.rejected,
+      d.peBreakdown?.['Registered FIR'],
+      d.peBreakdown?.['Register FIR'],
+      d.peBreakdown?.['PE Pending'],
+      d.peBreakdown?.['Recommended to DE'],
+      d.peBreakdown?.['Close'],
+      d.peBreakdown?.['High Court Stay']
+    ];
+
+    fVals.forEach((val, i) => {
+      const cell = sheet.getCell(curRow, startFocusCol + i);
+      cell.value = (val === 0 || val == null) ? '' : val;
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+    });
+
+    for (let c = 1; c <= totalCols; c++) {
+      const cell = sheet.getCell(curRow, c);
+      cell.border = borderStyle;
+      cell.font = { name: 'Arial', size: 9.5 };
+    }
+
+    sheet.getRow(curRow).height = 20;
+    curRow++;
+  });
+
+  // Total Row
+  sheet.mergeCells(curRow, 1, curRow, 2);
+  const totalLabel = sheet.getCell(curRow, 1);
+  totalLabel.value = 'TOTAL';
+  totalLabel.alignment = { horizontal: 'center', vertical: 'middle' };
+  totalLabel.font = { name: 'Arial', size: 10, bold: true };
+  totalLabel.fill = totalFill;
+
+  historicalYears.forEach((y, i) => {
+    const cell = sheet.getCell(curRow, startHistCol + i);
+    const val = totals.historical ? (totals.historical[y] || 0) : 0;
+    cell.value = val;
+    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+    cell.font = { name: 'Arial', size: 10, bold: true };
+    cell.fill = totalFill;
+  });
+
+  const totFocusVals = [
+    totals.totalRespondents || 0,
+    totals.notSentToCA || 0,
+    totals.sentToCA || 0,
+    totals.backToDist || 0,
+    totals.pendingWithCA || 0,
+    totals.obtained || 0,
+    totals.rejected || 0,
+    totals.peBreakdown?.['Registered FIR'] || 0,
+    totals.peBreakdown?.['Register FIR'] || 0,
+    totals.peBreakdown?.['PE Pending'] || 0,
+    totals.peBreakdown?.['Recommended to DE'] || 0,
+    totals.peBreakdown?.['Close'] || 0,
+    totals.peBreakdown?.['High Court Stay'] || 0
+  ];
+
+  totFocusVals.forEach((val, i) => {
+    const cell = sheet.getCell(curRow, startFocusCol + i);
+    cell.value = val;
+    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+    cell.font = { name: 'Arial', size: 10, bold: true };
+    cell.fill = totalFill;
+  });
+
+  for (let c = 1; c <= totalCols; c++) {
+    sheet.getCell(curRow, c).border = {
+      top: { style: 'thin', color: { argb: 'FF000000' } },
+      left: { style: 'thin', color: { argb: 'FF000000' } },
+      bottom: { style: 'double', color: { argb: 'FF000000' } },
+      right: { style: 'thin', color: { argb: 'FF000000' } }
+    };
+  }
+  sheet.getRow(curRow).height = 22;
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const cleanYear = isAll ? 'All_Years' : String(focusYear).replace(/[^a-zA-Z0-9_-]/g, '_');
+  const fileName = `17-A_District_Respondents_Statistics_${cleanYear}.xlsx`;
   saveAs(blob, fileName);
 }

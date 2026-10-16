@@ -1,4 +1,4 @@
-const prisma = require('./prismaClient');
+const prisma = require('../prismaClient');
 
 // Raw data provided by user: [DistrictInput, DesignationInput]
 const rawData = [

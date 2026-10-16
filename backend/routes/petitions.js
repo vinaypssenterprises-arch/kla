@@ -7,7 +7,13 @@ const { authMiddleware } = require('./auth');
 // Middleware to apply auth to all petition routes
 router.use(authMiddleware);
 
-const getIncludeOpts = () => ({
+const getListIncludeOpts = () => ({
+  respondents: true,
+  remarks: true,
+  createdBy: { select: { id: true, supervisorUserId: true } }
+});
+
+const getDetailIncludeOpts = () => ({
   respondents: true,
   remarks: true,
   history: {
@@ -16,6 +22,17 @@ const getIncludeOpts = () => ({
   },
   createdBy: { select: { id: true, supervisorUserId: true } }
 });
+
+const invalidateCaches = async () => {
+  try {
+    await Promise.all([
+      redisClient.delPattern('petitions:'),
+      redisClient.delPattern('analytics:')
+    ]);
+  } catch (e) {
+    // ignore
+  }
+};
 
 // Get all petitions — server-side pagination + rich filters + search
 router.get('/', async (req, res) => {
@@ -140,10 +157,10 @@ router.get('/', async (req, res) => {
 
     const baseWhere = effectiveDistrict ? { district: { equals: effectiveDistrict, mode: 'insensitive' } } : {};
 
-    const [petitions, total, pePendingCount, firCount, deCount, closeCount] = await Promise.all([
+    const [petitions, total, peGroups] = await Promise.all([
       prisma.petition.findMany({
         where,
-        include: getIncludeOpts(),
+        include: getListIncludeOpts(),
         orderBy,
         ...(isAll ? {} : {
           skip: (page - 1) * pageSize,
@@ -151,11 +168,26 @@ router.get('/', async (req, res) => {
         })
       }),
       prisma.petition.count({ where }),
-      prisma.petition.count({ where: { ...baseWhere, peStatus: { contains: 'pending', mode: 'insensitive' } } }),
-      prisma.petition.count({ where: { ...baseWhere, peStatus: { contains: 'fir', mode: 'insensitive' } } }),
-      prisma.petition.count({ where: { ...baseWhere, peStatus: { contains: 'de', mode: 'insensitive' } } }),
-      prisma.petition.count({ where: { ...baseWhere, peStatus: { contains: 'close', mode: 'insensitive' } } })
+      prisma.petition.groupBy({
+        by: ['peStatus'],
+        where: baseWhere,
+        _count: { _all: true }
+      })
     ]);
+
+    let pePendingCount = 0;
+    let firCount = 0;
+    let deCount = 0;
+    let closeCount = 0;
+
+    peGroups.forEach(g => {
+      const status = (g.peStatus || '').toLowerCase();
+      const count = g._count._all || 0;
+      if (status.includes('pending')) pePendingCount += count;
+      if (status.includes('fir')) firCount += count;
+      if (status.includes('de')) deCount += count;
+      if (status.includes('close')) closeCount += count;
+    });
 
     const result = {
       data: petitions,
@@ -183,9 +215,11 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Distinct officers for filter autocomplete & select
+// Distinct officers for filter autocomplete & select (cached for 2 minutes)
 router.get('/meta/officers', async (req, res) => {
   try {
+    const cached = await redisClient.get('meta:officers');
+    if (cached) return res.json(JSON.parse(cached));
     const [sirOfficers, respondents, registeredOfficers] = await Promise.all([
       prisma.petition.findMany({
         where: { sirOfficerName: { not: null } },
@@ -243,6 +277,7 @@ router.get('/meta/officers', async (req, res) => {
     });
 
     const officers = Array.from(officersMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+    await redisClient.setEx('meta:officers', 120, JSON.stringify(officers));
     res.json(officers);
   } catch (err) {
     console.error('Fetch officers meta error:', err);
@@ -258,22 +293,27 @@ router.post('/', async (req, res) => {
     const isAdminFullCreate = data.adminFullCreate === true && req.user.role === 'admin';
 
     // --- Determine status for admin full-create based on filled data ---
-    let status = 'SUBMITTED_TO_SUPERVISOR';
+    const isReturned = (data.proposalStatus || '').trim().toLowerCase().includes('returned');
+    let status = isReturned ? '17A_RETURNED' : 'SUBMITTED_TO_SUPERVISOR';
     if (isAdminFullCreate) {
-      const hasPE = !!(data.peNo || data.peStatus || data.peRegDate);
-      const allHaveCA = respondentsData.length > 0 &&
-        respondentsData.every(r => r.caDesignation && r.caDepartment && r.caSubDepartment && r.caPlace);
-      const allPermsResolved = respondentsData.length > 0 &&
-        respondentsData.every(r => r.permissionStatus && r.permissionStatus !== 'Pending');
-      const somePerms = respondentsData.some(r => r.permissionStatus && r.permissionStatus !== '');
-      const hasProposalAccepted = data.proposalStatus === 'Accept';
+      if (isReturned) {
+        status = '17A_RETURNED';
+      } else {
+        const hasPE = !!(data.peNo || data.peStatus || data.peRegDate);
+        const allHaveCA = respondentsData.length > 0 &&
+          respondentsData.every(r => r.caDesignation && r.caDepartment && r.caSubDepartment && r.caPlace);
+        const allPermsResolved = respondentsData.length > 0 &&
+          respondentsData.every(r => r.permissionStatus && r.permissionStatus !== 'Pending');
+        const somePerms = respondentsData.some(r => r.permissionStatus && r.permissionStatus !== '');
+        const hasProposalAccepted = data.proposalStatus === 'Accept';
 
-      if (hasPE)                          status = 'PRELIMINARY_ENQUIRY_SUBMITTED';
-      else if (allHaveCA && allPermsResolved) status = '17A_PERMISSION_COMPLETED';
-      else if (allHaveCA && somePerms)    status = '17A_PERMISSION_PENDING';
-      else if (allHaveCA)                 status = 'CA_SUBMITTED';
-      else if (hasProposalAccepted)       status = '17A_ACCEPTED';
-      // else stays 'SUBMITTED_TO_SUPERVISOR'
+        if (hasPE)                          status = 'PRELIMINARY_ENQUIRY_SUBMITTED';
+        else if (allHaveCA && allPermsResolved) status = '17A_PERMISSION_COMPLETED';
+        else if (allHaveCA && somePerms)    status = '17A_PERMISSION_PENDING';
+        else if (allHaveCA)                 status = 'CA_SUBMITTED';
+        else if (hasProposalAccepted)       status = '17A_ACCEPTED';
+        // else stays 'SUBMITTED_TO_SUPERVISOR'
+      }
     }
 
     const isGlobalUser = req.user.role === 'admin' || req.user.isHeadOffice === true;
@@ -304,13 +344,22 @@ router.post('/', async (req, res) => {
         // Admin full-create: save proposal + PE fields directly
         ...(isAdminFullCreate ? {
           proposalStatus: data.proposalStatus || null,
-          proposalSentDate: data.proposalSentDate ? new Date(data.proposalSentDate) : null,
-          peNo: data.peNo || null,
-          peStatus: data.peStatus || null,
-          peRegDate: data.peRegDate ? new Date(data.peRegDate) : null,
-          peReportSentDate: data.peReportSentDate ? new Date(data.peReportSentDate) : null,
-          sirEo: data.sirEo || null,
-          sirEoDesignation: data.sirEoDesignation || null,
+          proposalSentDate: isReturned ? null : (data.proposalSentDate ? new Date(data.proposalSentDate) : null),
+          peNo: isReturned ? null : (data.peNo || null),
+          peStatus: isReturned ? null : (data.peStatus || null),
+          peRegDate: isReturned ? null : (data.peRegDate ? new Date(data.peRegDate) : null),
+          peReportSentDate: isReturned ? null : (data.peReportSentDate ? new Date(data.peReportSentDate) : null),
+          sirEo: isReturned ? null : (data.sirEo || null),
+          sirEoDesignation: isReturned ? null : (data.sirEoDesignation || null),
+        } : {}),
+
+        ...((isAdminFullCreate && (data.returnRemarks || data.remarks)?.trim()) ? {
+          remarks: {
+            create: {
+              date: new Date(),
+              text: (data.returnRemarks || data.remarks).trim()
+            }
+          }
         } : {}),
 
         respondents: {
@@ -320,8 +369,8 @@ router.post('/', async (req, res) => {
             office: r.office,
             department: r.department,
             subDepartment: r.subDepartment,
-            // Admin full-create: include CA and permission fields per respondent
-            ...(isAdminFullCreate ? {
+            // Admin full-create: include CA and permission fields per respondent (unless returned)
+            ...(isAdminFullCreate && !isReturned ? {
               caDesignation: r.caDesignation || null,
               caDepartment: r.caDepartment || null,
               caSubDepartment: r.caSubDepartment || null,
@@ -337,19 +386,20 @@ router.post('/', async (req, res) => {
           create: {
             fromStatus: 'DRAFT',
             toStatus: status,
-            action: isAdminFullCreate ? 'ADMIN_CREATE_FULL' : 'CREATE_SUBMIT',
+            action: isAdminFullCreate ? (isReturned ? 'RETURN_17A' : 'ADMIN_CREATE_FULL') : 'CREATE_SUBMIT',
             actionById: req.user.userId,
-            remarks: isAdminFullCreate
-              ? 'Petition created by admin with full details'
-              : 'Petition initially submitted to supervisor'
+            remarks: (data.returnRemarks || data.remarks)?.trim() || (
+              isAdminFullCreate
+                ? (isReturned ? 'Proposal created and returned with remarks by admin' : 'Petition created by admin with full details')
+                : 'Petition initially submitted to supervisor'
+            )
           }
         }
       },
-      include: getIncludeOpts()
+      include: getDetailIncludeOpts()
     });
 
-    await redisClient.del('petitions:all');
-    await redisClient.del('petitions:stats');
+    await invalidateCaches();
 
     res.status(201).json(newPetition);
   } catch (error) {
@@ -363,7 +413,7 @@ router.get('/:id', async (req, res) => {
   try {
     const petition = await prisma.petition.findUnique({
       where: { id: req.params.id },
-      include: getIncludeOpts()
+      include: getDetailIncludeOpts()
     });
 
     if (!petition) return res.status(404).json({ error: 'Petition not found' });
@@ -576,11 +626,10 @@ router.post('/:id/action', async (req, res) => {
 
     const updatedPetition = await prisma.petition.findUnique({
       where: { id },
-      include: getIncludeOpts()
+      include: getDetailIncludeOpts()
     });
 
-    await redisClient.del('petitions:all');
-    await redisClient.del('petitions:stats');
+    await invalidateCaches();
 
     res.json(updatedPetition);
   } catch (error) {
@@ -625,7 +674,15 @@ router.put('/:id', async (req, res) => {
       }
     }
 
-    const nextStatus = data.status || petition.status;
+    const isReturned = (data.proposalStatus || '').trim().toLowerCase().includes('returned');
+    let nextStatus = data.status || petition.status;
+    if (isReturned) {
+      nextStatus = '17A_RETURNED';
+    } else if (data.proposalStatus === 'Accept' && (petition.status === '17A_RETURNED' || petition.status === 'DRAFT' || petition.status === 'SUBMITTED_TO_SUPERVISOR')) {
+      nextStatus = '17A_ACCEPTED';
+    }
+
+    const remarkText = (data.returnRemarks || data.remarks)?.trim();
 
     await prisma.$transaction(async (tx) => {
       // 1. Delete respondents that are no longer in submitted list
@@ -645,14 +702,14 @@ router.put('/:id', async (req, res) => {
           office: r.office || null,
           department: r.department || null,
           subDepartment: r.subDepartment || null,
-          caDesignation: r.caDesignation || null,
-          caDepartment: r.caDepartment || null,
-          caSubDepartment: r.caSubDepartment || null,
-          caPlace: r.caPlace || null,
-          permissionStatus: r.permissionStatus || null,
-          permissionSentDate: r.permissionSentDate ? new Date(r.permissionSentDate) : null,
-          permissionReceivedFromCA: r.permissionReceivedFromCA ? new Date(r.permissionReceivedFromCA) : null,
-          caSentToUnit: r.caSentToUnit ? new Date(r.caSentToUnit) : null
+          caDesignation: isReturned ? null : (r.caDesignation || null),
+          caDepartment: isReturned ? null : (r.caDepartment || null),
+          caSubDepartment: isReturned ? null : (r.caSubDepartment || null),
+          caPlace: isReturned ? null : (r.caPlace || null),
+          permissionStatus: isReturned ? null : (r.permissionStatus || null),
+          permissionSentDate: isReturned ? null : (r.permissionSentDate ? new Date(r.permissionSentDate) : null),
+          permissionReceivedFromCA: isReturned ? null : (r.permissionReceivedFromCA ? new Date(r.permissionReceivedFromCA) : null),
+          caSentToUnit: isReturned ? null : (r.caSentToUnit ? new Date(r.caSentToUnit) : null)
         };
 
         if (r.id && petition.respondents.some(pr => pr.id === r.id)) {
@@ -682,42 +739,47 @@ router.put('/:id', async (req, res) => {
           sirOfficerName: data.sirOfficerName || null,
           officerRank: data.officerRank || null,
           proposalStatus: data.proposalStatus || null,
-          proposalSentDate: data.proposalSentDate ? new Date(data.proposalSentDate) : null,
-          peNo: data.peNo || null,
-          peStatus: data.peStatus || null,
-          peRegDate: data.peRegDate ? new Date(data.peRegDate) : null,
-          peReportSentDate: data.peReportSentDate ? new Date(data.peReportSentDate) : null,
-          sirEo: data.sirEo || null,
-          sirEoDesignation: data.sirEoDesignation || null,
+          proposalSentDate: isReturned ? null : (data.proposalSentDate ? new Date(data.proposalSentDate) : null),
+          peNo: isReturned ? null : (data.peNo || null),
+          peStatus: isReturned ? null : (data.peStatus || null),
+          peRegDate: isReturned ? null : (data.peRegDate ? new Date(data.peRegDate) : null),
+          peReportSentDate: isReturned ? null : (data.peReportSentDate ? new Date(data.peReportSentDate) : null),
+          sirEo: isReturned ? null : (data.sirEo || null),
+          sirEoDesignation: isReturned ? null : (data.sirEoDesignation || null),
           status: nextStatus,
           updatedById: req.user.userId
         }
       });
 
-      // 4. Record History
+      // 4. Record Remark if provided
+      if (remarkText) {
+        await tx.remark.create({
+          data: {
+            date: new Date(),
+            text: remarkText,
+            petitionId: id
+          }
+        });
+      }
+
+      // 5. Record History
       await tx.petitionHistory.create({
         data: {
           petitionId: id,
           fromStatus: petition.status,
           toStatus: nextStatus,
-          action: 'ADMIN_UPDATE',
+          action: isReturned ? 'RETURN_17A' : 'ADMIN_UPDATE',
           actionById: req.user.userId,
-          remarks: 'Petition updated by administrator'
+          remarks: remarkText || (isReturned ? 'Proposal returned with remarks by administrator' : 'Petition updated by administrator')
         }
       });
     });
 
-    try {
-      const keys = await redisClient.keys('petitions:*');
-      if (keys.length > 0) await redisClient.del(keys);
-    } catch (e) {
-      await redisClient.del('petitions:all');
-      await redisClient.del('petitions:stats');
-    }
+    await invalidateCaches();
 
     const updated = await prisma.petition.findUnique({
       where: { id },
-      include: getIncludeOpts()
+      include: getDetailIncludeOpts()
     });
 
     res.json(updated);
@@ -740,8 +802,7 @@ router.delete('/:id', async (req, res) => {
 
     await prisma.petition.delete({ where: { id: req.params.id } });
 
-    await redisClient.del('petitions:all');
-    await redisClient.del('petitions:stats');
+    await invalidateCaches();
 
     res.status(204).send();
   } catch (error) {

@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const prisma = require('../prismaClient');
+const redisClient = require('../redisClient');
 const { authMiddleware } = require('./auth');
 
 router.use(authMiddleware);
@@ -9,6 +10,10 @@ router.use(authMiddleware);
 router.get('/', async (req, res) => {
   try {
     const { districtId, includeAllDistricts } = req.query;
+    const cacheKey = `designations:${districtId || 'ALL'}:${includeAllDistricts || 'true'}`;
+    const cached = await redisClient.get(cacheKey);
+    if (cached) return res.json(JSON.parse(cached));
+
     let where = {};
     if (districtId) {
       if (includeAllDistricts === 'false') {
@@ -31,6 +36,8 @@ router.get('/', async (req, res) => {
       },
       orderBy: { createdAt: 'desc' }
     });
+
+    await redisClient.setEx(cacheKey, 300, JSON.stringify(designations));
     res.json(designations);
   } catch (error) {
     console.error('Fetch designations error:', error);
@@ -83,6 +90,8 @@ router.post('/', async (req, res) => {
         }
       }
     });
+
+    await redisClient.delPattern('designations:');
     res.status(201).json(designation);
   } catch (error) {
     console.error('Create designation error:', error);
@@ -138,6 +147,8 @@ router.put('/:id', async (req, res) => {
         }
       }
     });
+
+    await redisClient.delPattern('designations:');
     res.json(designation);
   } catch (error) {
     if (error.code === 'P2025') return res.status(404).json({ error: 'Designation not found' });
@@ -163,6 +174,7 @@ router.delete('/:id', async (req, res) => {
     }
 
     await prisma.designation.delete({ where: { id } });
+    await redisClient.delPattern('designations:');
     res.status(204).send();
   } catch (error) {
     if (error.code === 'P2025') return res.status(404).json({ error: 'Designation not found' });

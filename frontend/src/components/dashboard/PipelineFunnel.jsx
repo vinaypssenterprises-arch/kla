@@ -1,16 +1,21 @@
 import React from 'react';
-import { ArrowRight, Shield, FileCheck, CheckCircle2, Search, Gavel } from 'lucide-react';
+import { ArrowRight, Shield, FileCheck, CheckCircle2, Search, Gavel, Users, Send } from 'lucide-react';
 
 const STEP_ICONS = [
   FileCheck,
-  Shield,
+  Send,
   CheckCircle2,
   Search,
   Gavel
 ];
 
-export default function PipelineFunnel({ pipeline = [] }) {
+export default function PipelineFunnel({ pipeline = [], viewMode = 'proposals' }) {
   if (!pipeline || pipeline.length === 0) return null;
+
+  const isRespondents = viewMode === 'respondents';
+  const totalVolume = pipeline[0]?.count || 0;
+  const unitLabel = isRespondents ? 'officers' : 'cases';
+  const unitTitle = isRespondents ? 'Accused Officers' : 'Petitions';
 
   return (
     <div className="bg-[#FFFDF7] border border-rule/60 rounded-xl p-5 shadow-soft">
@@ -19,13 +24,24 @@ export default function PipelineFunnel({ pipeline = [] }) {
           <div className="flex items-center gap-2">
             <span className="inline-block w-2.5 h-2.5 rounded-full bg-brass animate-pulse" />
             <h3 className="text-base font-serif font-bold text-ink-text">
-              Section 17-A
+              {isRespondents 
+                ? 'Section 17-A Accused Public Servants Enforcement Lifecycle'
+                : 'Section 17-A Case Progression & Sanction Lifecycle'
+              }
             </h3>
           </div>
+          <p className="text-xs text-ink-text-soft mt-0.5">
+            {isRespondents
+              ? 'End-to-end statutory tracking of named public servants from proposal to prosecution'
+              : 'End-to-end statutory conversion funnel across all 5 enforcement milestone stages'
+            }
+          </p>
         </div>
-        <div className="flex items-center gap-2 self-start sm:self-auto text-[11px] font-mono font-medium text-ink-text-soft bg-parchment-2/60 px-3 py-1 rounded-md border border-rule/40">
+        <div className="flex items-center gap-2 self-start sm:self-auto text-[11px] font-mono font-medium text-ink-text-soft bg-parchment-2/60 px-3 py-1.5 rounded-md border border-rule/40 shadow-2xs">
           <span>Total Pipeline Volume:</span>
-          <span className="font-bold text-ink-text">{pipeline[0]?.count || 0} Petitions</span>
+          <span className="font-bold text-ink-text text-xs">
+            {totalVolume.toLocaleString('en-IN')} {unitTitle}
+          </span>
         </div>
       </div>
 
@@ -38,6 +54,8 @@ export default function PipelineFunnel({ pipeline = [] }) {
           const passThrough = prevCount && prevCount > 0 
             ? Math.round((item.count / prevCount) * 100) 
             : null;
+
+          const percentageOfTotal = Math.min(100, Math.max(0, item.percentage || 0));
 
           return (
             <div key={item.step} className="relative flex flex-col">
@@ -56,8 +74,8 @@ export default function PipelineFunnel({ pipeline = [] }) {
                     STAGE {index + 1}
                   </span>
                   <div 
-                    className="w-7 h-7 rounded-lg flex items-center justify-center"
-                    style={{ backgroundColor: `${item.color}15`, color: item.color }}
+                    className="w-7 h-7 rounded-lg flex items-center justify-center shadow-2xs"
+                    style={{ backgroundColor: `${item.color}18`, color: item.color }}
                   >
                     <Icon className="w-4 h-4" />
                   </div>
@@ -71,18 +89,18 @@ export default function PipelineFunnel({ pipeline = [] }) {
                 {/* Big Count */}
                 <div className="flex items-baseline gap-2 mb-2">
                   <span className="text-2xl font-serif font-bold text-ink-text">
-                    {item.count}
+                    {item.count.toLocaleString('en-IN')}
                   </span>
-                  <span className="text-[11px] text-ink-text-soft">cases</span>
+                  <span className="text-[11px] text-ink-text-soft font-mono">{unitLabel}</span>
                 </div>
 
                 {/* Progress bar representing overall volume */}
-                <div className="w-full bg-parchment-2 h-1.5 rounded-full overflow-hidden mb-2">
+                <div className="w-full bg-parchment-2 h-1.5 rounded-full overflow-hidden mb-2 border border-rule/20">
                   <div 
                     className="h-full rounded-full transition-all duration-500"
                     style={{ 
                       backgroundColor: item.color,
-                      width: `${Math.max(5, Math.min(100, item.percentage))}%` 
+                      width: `${Math.max(5, percentageOfTotal)}%` 
                     }}
                   />
                 </div>
@@ -90,7 +108,7 @@ export default function PipelineFunnel({ pipeline = [] }) {
                 {/* Footer metrics */}
                 <div className="flex items-center justify-between text-[10.5px] text-ink-text-soft">
                   <span>Of Total:</span>
-                  <span className="font-semibold text-ink-text">{item.percentage}%</span>
+                  <span className="font-semibold text-ink-text">{percentageOfTotal}%</span>
                 </div>
 
                 {passThrough !== null && (

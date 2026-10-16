@@ -47,53 +47,55 @@ router.get('/stats', async (req, res) => {
 });
 
 // Standard Karnataka Lokayukta SP Police Division Units / Districts in order
-const STANDARD_DISTRICT_ORDER = [
-  'SP-1 BNG CITY', 'SP-2 BNG CITY', 'BANGALORE RURAL', 'BAGALKOT', 'BELGAVI',
-  'BELLARY', 'BIDAR', 'CHAMRAJNAGAR', 'CHIKKABALLAPUR', 'CHIKKAMAGALUR',
-  'CHITRADURGA', 'DAVANGERE', 'DHARWAD', 'GADAG', 'HASSAN', 'HAVERI',
-  'HOSPET', 'KALBURGI', 'KARWAR', 'KODAGU', 'KOLAR', 'KOPPAL', 'MANDYA',
-  'MANGALORE', 'MYSURU', 'RAICHUR', 'RAMANAGARA', 'SHIVAMOGGA', 'TUMAKURU',
-  'UDUPI', 'VIJAYAPURA', 'YADGIR'
+// Standard Karnataka Lokayukta SP Police Division Units / Districts in preferred order
+const PREFERRED_DISTRICT_ORDER = [
+  'Bengaluru City 1', 'Bengaluru City 2', 'Bengaluru Rural', 'Bengaluru South',
+  'Bagalkote', 'Ballari', 'Belagavi', 'Bidar', 'Chamarajanagar',
+  'Chikkaballapura', 'Chikkamagaluru', 'Chitradurga', 'Davanagere', 'Dharwad',
+  'Gadag', 'Hassan', 'Haveri', 'Kalaburagi', 'Karwar', 'Kodagu', 'Kolar',
+  'Koppal', 'Mandya', 'Mangalore', 'Mysuru', 'Raichur', 'Shivamogga',
+  'Tumakuru', 'Udupi', 'Vijayanagara', 'Vijayapura', 'Yadgir'
 ];
 
 function normalizeDistrictName(rawName) {
   if (!rawName) return 'OTHER';
   const clean = rawName.trim().toUpperCase();
-  if (clean.includes('SP-1') || clean.includes('SP 1') || clean === 'SP1 BNG CITY') return 'SP-1 BNG CITY';
-  if (clean.includes('SP-2') || clean.includes('SP 2') || clean === 'SP2 BNG CITY') return 'SP-2 BNG CITY';
-  if (clean === 'BENGALURU URBAN' || clean === 'BANGALORE URBAN') return 'SP-1 BNG CITY';
-  if (clean === 'BENGALURU RURAL' || clean === 'BANGALORE RURAL') return 'BANGALORE RURAL';
-  if (clean === 'BAGALKOTE' || clean === 'BAGALKOT') return 'BAGALKOT';
-  if (clean === 'BELAGAVI' || clean === 'BELGAVI') return 'BELGAVI';
-  if (clean === 'BALLARI' || clean === 'BELLARY') return 'BELLARY';
-  if (clean === 'BIDAR') return 'BIDAR';
-  if (clean === 'CHAMARAJANAGAR' || clean === 'CHAMRAJNAGAR') return 'CHAMRAJNAGAR';
-  if (clean === 'CHIKKABALLAPURA' || clean === 'CHIKKABALLAPUR') return 'CHIKKABALLAPUR';
-  if (clean === 'CHIKKAMAGALURU' || clean === 'CHIKKAMAGALUR') return 'CHIKKAMAGALUR';
-  if (clean === 'CHITRADURGA') return 'CHITRADURGA';
-  if (clean === 'DAVANAGERE' || clean === 'DAVANGERE') return 'DAVANGERE';
-  if (clean === 'DHARWAD') return 'DHARWAD';
-  if (clean === 'GADAG') return 'GADAG';
-  if (clean === 'HASSAN') return 'HASSAN';
-  if (clean === 'HAVERI') return 'HAVERI';
-  if (clean === 'HOSPET' || clean === 'VIJAYANAGARA') return 'HOSPET';
-  if (clean === 'KALABURAGI' || clean === 'KALBURGI') return 'KALBURGI';
-  if (clean === 'KARWAR' || clean === 'UTTARA KANNADA') return 'KARWAR';
-  if (clean === 'KODAGU') return 'KODAGU';
-  if (clean === 'KOLAR') return 'KOLAR';
-  if (clean === 'KOPPAL') return 'KOPPAL';
-  if (clean === 'MANDYA') return 'MANDYA';
-  if (clean === 'MANGALORE' || clean === 'DAKSHINA KANNADA') return 'MANGALORE';
-  if (clean === 'MYSURU' || clean === 'MYSORE') return 'MYSURU';
-  if (clean === 'RAICHUR') return 'RAICHUR';
-  if (clean === 'RAMANAGARA') return 'RAMANAGARA';
-  if (clean === 'SHIVAMOGGA') return 'SHIVAMOGGA';
-  if (clean === 'TUMAKURU' || clean === 'TUMKUR') return 'TUMAKURU';
-  if (clean === 'UDUPI') return 'UDUPI';
-  if (clean === 'VIJAYAPURA' || clean === 'BIJAPUR') return 'VIJAYAPURA';
-  if (clean === 'YADGIR') return 'YADGIR';
-  if (clean === 'HEAD OFFICE') return 'HEAD OFFICE';
-  return clean;
+  if (clean.includes('SP-1') || clean.includes('SP 1') || clean === 'SP1 BNG CITY' || clean === 'BENGALURU CITY 1' || clean === 'BANGALORE CITY 1') return 'Bengaluru City 1';
+  if (clean.includes('SP-2') || clean.includes('SP 2') || clean === 'SP2 BNG CITY' || clean === 'BENGALURU CITY 2' || clean === 'BANGALORE CITY 2') return 'Bengaluru City 2';
+  if (clean === 'BENGALURU URBAN' || clean === 'BANGALORE URBAN') return 'Bengaluru City 1';
+  if (clean === 'BENGALURU RURAL' || clean === 'BANGALORE RURAL') return 'Bengaluru Rural';
+  if (clean === 'BENGALURU SOUTH' || clean === 'BANGALORE SOUTH') return 'Bengaluru South';
+  if (clean === 'BAGALKOTE' || clean === 'BAGALKOT') return 'Bagalkote';
+  if (clean === 'BELAGAVI' || clean === 'BELGAVI') return 'Belagavi';
+  if (clean === 'BALLARI' || clean === 'BELLARY') return 'Ballari';
+  if (clean === 'BIDAR') return 'Bidar';
+  if (clean === 'CHAMARAJANAGAR' || clean === 'CHAMRAJNAGAR') return 'Chamarajanagar';
+  if (clean === 'CHIKKABALLAPURA' || clean === 'CHIKKABALLAPUR') return 'Chikkaballapura';
+  if (clean === 'CHIKKAMAGALURU' || clean === 'CHIKKAMAGALUR') return 'Chikkamagaluru';
+  if (clean === 'CHITRADURGA') return 'Chitradurga';
+  if (clean === 'DAVANAGERE' || clean === 'DAVANGERE') return 'Davanagere';
+  if (clean === 'DHARWAD') return 'Dharwad';
+  if (clean === 'GADAG') return 'Gadag';
+  if (clean === 'HASSAN') return 'Hassan';
+  if (clean === 'HAVERI') return 'Haveri';
+  if (clean === 'HOSPET' || clean === 'VIJAYANAGARA') return 'Vijayanagara';
+  if (clean === 'KALABURAGI' || clean === 'KALBURGI') return 'Kalaburagi';
+  if (clean === 'KARWAR' || clean === 'UTTARA KANNADA') return 'Karwar';
+  if (clean === 'KODAGU') return 'Kodagu';
+  if (clean === 'KOLAR') return 'Kolar';
+  if (clean === 'KOPPAL') return 'Koppal';
+  if (clean === 'MANDYA') return 'Mandya';
+  if (clean === 'MANGALORE' || clean === 'DAKSHINA KANNADA') return 'Mangalore';
+  if (clean === 'MYSURU' || clean === 'MYSORE') return 'Mysuru';
+  if (clean === 'RAICHUR') return 'Raichur';
+  if (clean === 'RAMANAGARA') return 'Ramanagara';
+  if (clean === 'SHIVAMOGGA') return 'Shivamogga';
+  if (clean === 'TUMAKURU' || clean === 'TUMKUR') return 'Tumakuru';
+  if (clean === 'UDUPI') return 'Udupi';
+  if (clean === 'VIJAYAPURA' || clean === 'BIJAPUR') return 'Vijayapura';
+  if (clean === 'YADGIR') return 'Yadgir';
+  if (clean === 'HEAD OFFICE') return 'Head Office';
+  return rawName.trim();
 }
 
 function getPetitionYear(p) {
@@ -127,6 +129,18 @@ function getPetitionDate(p) {
   return new Date();
 }
 
+function normalizePeStatus(raw) {
+  if (!raw) return '';
+  const s = raw.trim().toLowerCase();
+  if (s === 'registered fir' || s === 'registeredfir') return 'Registered FIR';
+  if (s === 'register fir' || s === 'registerfir' || s === 'fir') return 'Register FIR';
+  if (s === 'pe pending' || s === 'pepending' || s === 'pending') return 'PE Pending';
+  if (s === 'recommended to de' || s.includes('de') || s.includes('departmental')) return 'Recommended to DE';
+  if (s === 'close' || s === 'closed' || s === 'drop' || s === 'disposed') return 'Close';
+  if (s.includes('stay') || s.includes('high court')) return 'High Court Stay';
+  return raw.trim();
+}
+
 // District-wise and PE-status-wise breakdowns for the Reports page
 router.get('/reports', async (req, res) => {
   try {
@@ -147,7 +161,54 @@ router.get('/reports', async (req, res) => {
     const isAllYears = req.query.year === 'ALL';
     const focusYear = isAllYears ? 'ALL' : (fromDate ? fromDate.getFullYear() : (parseInt(req.query.year) || currentYear));
 
-    const startYear = 2017;
+    const [allDbDistricts, petitions, peGroups, officersByDistrict] = await Promise.all([
+      prisma.district.findMany({
+        where: {
+          isActive: true,
+          ...((!isGlobalUser && userDistrictId) ? { id: userDistrictId } : {})
+        },
+        select: { id: true, name: true }
+      }),
+      prisma.petition.findMany({
+        where: (!isGlobalUser && userDistrictName) ? { district: { equals: userDistrictName, mode: 'insensitive' } } : {},
+        select: {
+          id: true,
+          district: true,
+          petitionNo: true,
+          proposalStatus: true,
+          status: true,
+          proposalSentDate: true,
+          createdAt: true,
+          peStatus: true,
+          respondents: {
+            select: {
+              permissionStatus: true,
+              permissionSentDate: true,
+              caDesignation: true
+            }
+          }
+        }
+      }),
+      prisma.petition.groupBy({
+        by: ['peStatus'],
+        where: (!isGlobalUser && userDistrictName) ? { district: { equals: userDistrictName, mode: 'insensitive' } } : {},
+        _count: { _all: true }
+      }),
+      prisma.officer.groupBy({
+        by: ['districtId'],
+        where: { isActive: true },
+        _count: { _all: true }
+      })
+    ]);
+
+    // Calculate dynamic start year (earliest recorded year from petitions, e.g. 2016)
+    let minYear = 2016;
+    petitions.forEach(p => {
+      const y = getPetitionYear(p);
+      if (y && y >= 2000 && y < minYear) minYear = y;
+    });
+    const startYear = minYear;
+
     const historicalYears = [];
     if (isAllYears) {
       for (let y = startYear; y <= currentYear; y++) {
@@ -159,44 +220,28 @@ router.get('/reports', async (req, res) => {
       }
     }
 
-    const [allDbDistricts, petitions, peGroups, officersByDistrict] = await Promise.all([
-      prisma.district.findMany({
-        where: {
-          isActive: true,
-          ...((!isGlobalUser && userDistrictId) ? { id: userDistrictId } : {})
-        },
-        select: { id: true, name: true }
-      }),
-      prisma.petition.findMany({
-        where: (!isGlobalUser && userDistrictName) ? { district: { equals: userDistrictName, mode: 'insensitive' } } : {},
-        include: { respondents: true }
-      }),
-      prisma.petition.groupBy({
-        by: ['peStatus'],
-        where: (!isGlobalUser && userDistrictName) ? { district: { equals: userDistrictName, mode: 'insensitive' } } : {},
-        _count: { _all: true }
-      }),
-      prisma.officer.groupBy({
-        by: ['districtId'],
-        where: {
-          isActive: true,
-          ...((!isGlobalUser && userDistrictId) ? { districtId: userDistrictId } : {})
-        },
-        _count: { _all: true }
-      })
-    ]);
-
     const districtNameById = Object.fromEntries(allDbDistricts.map(d => [d.id, d.name]));
 
+    const activeDbList = allDbDistricts.map(d => normalizeDistrictName(d.name));
     const orderedDistricts = (!isGlobalUser && userDistrictName)
       ? [normalizeDistrictName(userDistrictName)]
-      : [...STANDARD_DISTRICT_ORDER];
-    allDbDistricts.forEach(d => {
-      const norm = normalizeDistrictName(d.name);
-      if (!orderedDistricts.includes(norm)) {
-        orderedDistricts.push(norm);
-      }
-    });
+      : [...activeDbList].sort((a, b) => {
+          const idxA = PREFERRED_DISTRICT_ORDER.indexOf(a);
+          const idxB = PREFERRED_DISTRICT_ORDER.indexOf(b);
+          if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+          if (idxA !== -1) return -1;
+          if (idxB !== -1) return 1;
+          return a.localeCompare(b);
+        });
+
+    const PE_KEYS = [
+      'Registered FIR',
+      'Register FIR',
+      'PE Pending',
+      'Recommended to DE',
+      'Close',
+      'High Court Stay'
+    ];
 
     const districtStatsMap = {};
     orderedDistricts.forEach(dist => {
@@ -204,11 +249,18 @@ router.get('/reports', async (req, res) => {
         district: dist,
         historical: {},
         totalReceivedAtHq: 0,
+        notSentToCA: 0,
         proposalsSentToCA: 0,
         proposalsSentBackToDist: 0,
-        obtained: 0,
-        rejected: 0,
-        pendingWithCA: 0
+        pendingWithCA: 0,
+        peBreakdown: {
+          'Registered FIR': 0,
+          'Register FIR': 0,
+          'PE Pending': 0,
+          'Recommended to DE': 0,
+          'Close': 0,
+          'High Court Stay': 0
+        }
       };
       historicalYears.forEach(y => {
         districtStatsMap[dist].historical[y] = 0;
@@ -222,11 +274,18 @@ router.get('/reports', async (req, res) => {
           district: normDist,
           historical: {},
           totalReceivedAtHq: 0,
+          notSentToCA: 0,
           proposalsSentToCA: 0,
           proposalsSentBackToDist: 0,
-          obtained: 0,
-          rejected: 0,
-          pendingWithCA: 0
+          pendingWithCA: 0,
+          peBreakdown: {
+            'Registered FIR': 0,
+            'Register FIR': 0,
+            'PE Pending': 0,
+            'Recommended to DE': 0,
+            'Close': 0,
+            'High Court Stay': 0
+          }
         };
         historicalYears.forEach(y => {
           districtStatsMap[normDist].historical[y] = 0;
@@ -249,34 +308,37 @@ router.get('/reports', async (req, res) => {
         const propStatus = (p.proposalStatus || '').trim().toLowerCase();
         const pStatus = (p.status || '').trim();
 
-        const isSentToCA = 
-          propStatus === 'accept' ||
-          pStatus === 'CA_SUBMITTED' ||
-          pStatus === '17A_PERMISSION_PENDING' ||
-          pStatus === '17A_PERMISSION_COMPLETED' ||
-          pStatus === 'PRELIMINARY_ENQUIRY_SUBMITTED' ||
-          p.proposalSentDate != null ||
-          (p.respondents && p.respondents.some(r => r.permissionSentDate || r.caDesignation));
-
         const isSentBackToDist = 
           propStatus.includes('returned') ||
           pStatus === '17A_RETURNED';
 
-        const isObtained = p.respondents && p.respondents.some(r => 
-          (r.permissionStatus || '').trim().toLowerCase() === 'obtain'
+        const hasDateSentToCA = Boolean(
+          (p.proposalSentDate != null && String(p.proposalSentDate).trim() !== '') ||
+          (p.respondents && p.respondents.some(r => r.permissionSentDate != null && String(r.permissionSentDate).trim() !== ''))
         );
 
-        const isRejected = p.respondents && p.respondents.some(r => 
-          (r.permissionStatus || '').trim().toLowerCase() === 'reject'
-        );
+        // Not Sent to CA: Date Sent to CA is not updated and not returned back to dist
+        const isNotSentToCA = !hasDateSentToCA && !isSentBackToDist;
 
-        const isPendingWithCA = isSentToCA && !isObtained && !isRejected;
+        // Proposals Sent to CA: only if Date Sent to CA is updated and not returned
+        const isSentToCA = !isSentBackToDist && hasDateSentToCA;
 
+        // Pending with CA: until PE Status is updated
+        const peStat = (p.peStatus || '').trim();
+        const isPendingWithCA = isSentToCA && peStat === '';
+
+        if (isNotSentToCA) row.notSentToCA++;
         if (isSentToCA) row.proposalsSentToCA++;
         if (isSentBackToDist) row.proposalsSentBackToDist++;
-        if (isObtained) row.obtained++;
-        if (isRejected) row.rejected++;
         if (isPendingWithCA) row.pendingWithCA++;
+
+        if (peStat !== '') {
+          PE_KEYS.forEach(k => {
+            if (peStat.toLowerCase() === k.toLowerCase()) {
+              row.peBreakdown[k] = (row.peBreakdown[k] || 0) + 1;
+            }
+          });
+        }
       } else {
         if (pYear < focusYear) {
           if (row.historical[pYear] !== undefined) {
@@ -291,34 +353,37 @@ router.get('/reports', async (req, res) => {
           const propStatus = (p.proposalStatus || '').trim().toLowerCase();
           const pStatus = (p.status || '').trim();
 
-          const isSentToCA = 
-            propStatus === 'accept' ||
-            pStatus === 'CA_SUBMITTED' ||
-            pStatus === '17A_PERMISSION_PENDING' ||
-            pStatus === '17A_PERMISSION_COMPLETED' ||
-            pStatus === 'PRELIMINARY_ENQUIRY_SUBMITTED' ||
-            p.proposalSentDate != null ||
-            (p.respondents && p.respondents.some(r => r.permissionSentDate || r.caDesignation));
-
           const isSentBackToDist = 
             propStatus.includes('returned') ||
             pStatus === '17A_RETURNED';
 
-          const isObtained = p.respondents && p.respondents.some(r => 
-            (r.permissionStatus || '').trim().toLowerCase() === 'obtain'
+          const hasDateSentToCA = Boolean(
+            (p.proposalSentDate != null && String(p.proposalSentDate).trim() !== '') ||
+            (p.respondents && p.respondents.some(r => r.permissionSentDate != null && String(r.permissionSentDate).trim() !== ''))
           );
 
-          const isRejected = p.respondents && p.respondents.some(r => 
-            (r.permissionStatus || '').trim().toLowerCase() === 'reject'
-          );
+          // Not Sent to CA: Date Sent to CA is not updated and not returned back to dist
+          const isNotSentToCA = !hasDateSentToCA && !isSentBackToDist;
 
-          const isPendingWithCA = isSentToCA && !isObtained && !isRejected;
+          // Proposals Sent to CA: only if Date Sent to CA is updated and not returned
+          const isSentToCA = !isSentBackToDist && hasDateSentToCA;
 
+          // Pending with CA: until PE Status is updated
+          const peStat = (p.peStatus || '').trim();
+          const isPendingWithCA = isSentToCA && peStat === '';
+
+          if (isNotSentToCA) row.notSentToCA++;
           if (isSentToCA) row.proposalsSentToCA++;
           if (isSentBackToDist) row.proposalsSentBackToDist++;
-          if (isObtained) row.obtained++;
-          if (isRejected) row.rejected++;
           if (isPendingWithCA) row.pendingWithCA++;
+
+          if (peStat !== '') {
+            PE_KEYS.forEach(k => {
+              if (peStat.toLowerCase() === k.toLowerCase()) {
+                row.peBreakdown[k] = (row.peBreakdown[k] || 0) + 1;
+              }
+            });
+          }
         }
       }
     });
@@ -336,11 +401,18 @@ router.get('/reports', async (req, res) => {
     const totals = {
       historical: {},
       totalReceivedAtHq: 0,
+      notSentToCA: 0,
       proposalsSentToCA: 0,
       proposalsSentBackToDist: 0,
-      obtained: 0,
-      rejected: 0,
-      pendingWithCA: 0
+      pendingWithCA: 0,
+      peBreakdown: {
+        'Registered FIR': 0,
+        'Register FIR': 0,
+        'PE Pending': 0,
+        'Recommended to DE': 0,
+        'Close': 0,
+        'High Court Stay': 0
+      }
     };
     historicalYears.forEach(y => {
       totals.historical[y] = 0;
@@ -351,11 +423,13 @@ router.get('/reports', async (req, res) => {
         totals.historical[y] += (row.historical[y] || 0);
       });
       totals.totalReceivedAtHq += row.totalReceivedAtHq;
+      totals.notSentToCA += row.notSentToCA;
       totals.proposalsSentToCA += row.proposalsSentToCA;
       totals.proposalsSentBackToDist += row.proposalsSentBackToDist;
-      totals.obtained += row.obtained;
-      totals.rejected += row.rejected;
       totals.pendingWithCA += row.pendingWithCA;
+      PE_KEYS.forEach(k => {
+        totals.peBreakdown[k] = (totals.peBreakdown[k] || 0) + (row.peBreakdown[k] || 0);
+      });
     });
 
     const petitionsByDistrict = districtStats.map(d => ({
@@ -373,7 +447,7 @@ router.get('/reports', async (req, res) => {
       totals,
       petitionsByDistrict,
       petitionsByPeStatus: peGroups.map(r => ({ status: r.peStatus || 'Not Set', count: r._count._all })),
-      officersByDistrict: officersByDistrict.map(r => ({ district: districtNameById[r.districtId] || 'Unknown', count: r._count._all }))
+      officersByDistrict: (officersByDistrict || []).map(r => ({ district: districtNameById[r.districtId] || 'Unknown', count: r._count?._all || 0 }))
     });
   } catch (error) {
     console.error('Reports error:', error);
@@ -418,7 +492,7 @@ router.get('/analytics', async (req, res) => {
     }
 
     // Fetch all petitions matching criteria with respondents
-    const [petitions, allDistricts, activeOfficers, allRespondents] = await Promise.all([
+    const [petitions, allDistricts, activeOfficers] = await Promise.all([
       prisma.petition.findMany({
         where: petitionWhere,
         include: {
@@ -438,133 +512,178 @@ router.get('/analytics', async (req, res) => {
       prisma.officer.findMany({
         where: officerWhere,
         select: { id: true, name: true, designation: true, district: { select: { name: true } } }
-      }),
-      prisma.respondent.findMany({
-        where: targetDistrict && targetDistrict !== 'ALL'
-          ? { petition: { district: { equals: targetDistrict, mode: 'insensitive' } } }
-          : {},
-        include: {
-          petition: {
-            select: { id: true, petitionNo: true, district: true, status: true, proposalSentDate: true }
-          }
-        }
       })
     ]);
 
-    // Calculate Overview KPIs
-    const totalPetitions = petitions.length;
-    let acceptedProposals = 0;
-    let rejectedProposals = 0;
-    let pendingProposals = 0;
-    let proposalsSentCount = 0;
-    let peInitiatedCount = 0;
-    let firRegistered = 0;
-    let regularEnquiries = 0;
-    let casesClosed = 0;
+    // Derive respondents directly from petitions to avoid expensive duplicate DB query
+    const allRespondents = petitions.flatMap(p => (p.respondents || []).map(r => ({ ...r, petition: p })));
 
+    // Calculate Overview KPIs (Proposals & Respondents unified with Reports)
+    const totalPetitions = petitions.length;
+    let proposalsSentToCA = 0;
+    let proposalsNotSentToCA = 0;
+    let proposalsBackToDist = 0;
+    let proposalsPendingWithCA = 0;
+    let proposalsPeActionTaken = 0;
+    let proposalsSanctionsObtained = 0;
+    let proposalsSanctionsRejected = 0;
+    let proposalsFirRegistered = 0;
+    let proposalsRegisterFir = 0;
+    let proposalsPePending = 0;
+    let proposalsClosed = 0;
+    let proposalsRecommendedDE = 0;
+    let proposalsHCStay = 0;
+
+    let respondentsTotal = 0;
+    let respondentsSentToCA = 0;
+    let respondentsNotSentToCA = 0;
+    let respondentsBackToDist = 0;
+    let respondentsPendingWithCA = 0;
+    let respondentsObtained = 0;
+    let respondentsRejected = 0;
+    let respondentsFirRegistered = 0;
+    let respondentsRegisterFir = 0;
+    let respondentsPePending = 0;
+    let respondentsRecommendedDE = 0;
+    let respondentsClosed = 0;
+    let respondentsHCStay = 0;
+
+    const departmentCounts = {};
+    const permissionStatusCounts = {
+      'Permission Obtained': 0,
+      'Awaiting Sanction (Pending)': 0,
+      'Permission Rejected': 0
+    };
     const peStatusCounts = {};
     const proposalStatusCounts = {};
-
-    petitions.forEach(p => {
-      const prop = (p.proposalStatus || '').trim().toLowerCase();
-      if (prop === 'accept') acceptedProposals++;
-      else if (prop === 'reject') rejectedProposals++;
-      else pendingProposals++;
-
-      if (p.proposalSentDate) proposalsSentCount++;
-      if (p.peNo || p.peRegDate || p.peStatus) peInitiatedCount++;
-
-      const pe = (p.peStatus || '').trim();
-      let peLabel = 'Enquiry in Progress';
-      if (pe) {
-        if (pe.toLowerCase().includes('fir')) {
-          peLabel = 'Register FIR';
-          firRegistered++;
-        } else if (pe.toLowerCase().includes('regular')) {
-          peLabel = 'Regular Enquiry';
-          regularEnquiries++;
-        } else if (pe.toLowerCase().includes('close') || pe.toLowerCase().includes('drop')) {
-          peLabel = 'Closed / Disposed';
-          casesClosed++;
-        } else {
-          peLabel = pe;
-        }
-      }
-      peStatusCounts[peLabel] = (peStatusCounts[peLabel] || 0) + 1;
-
-      const pKey = p.proposalStatus || 'Pending Scrutiny';
-      proposalStatusCounts[pKey] = (proposalStatusCounts[pKey] || 0) + 1;
-    });
-
-    // Respondent and Permission Statistics
-    let permissionsObtained = 0;
-    let permissionsPending = 0;
-    let permissionsRejected = 0;
-    const departmentCounts = {};
-    const permissionStatusCounts = {};
     const nowMs = Date.now();
-    const caAgingList = [];
+    const caAgingList = []; // Only cases/respondents awaiting decision from CA
+    const pendingPetitionsAging = [];
 
-    // Department aggregation: count at most once per petition for each department
     petitions.forEach(p => {
-      const uniqueDepts = new Set(
-        (p.respondents || [])
-          .map(r => (r.department || '').trim())
-          .filter(Boolean)
+      const propStatus = (p.proposalStatus || '').trim().toLowerCase();
+      const pStatus = (p.status || '').trim();
+      const isReturned = propStatus.includes('returned') || pStatus === '17A_RETURNED';
+      const hasDateSentToCA = Boolean(
+        (p.proposalSentDate != null && String(p.proposalSentDate).trim() !== '') ||
+        (p.respondents && p.respondents.some(r => r.permissionSentDate != null && String(r.permissionSentDate).trim() !== ''))
       );
+
+      const isSentToCA = !isReturned && hasDateSentToCA;
+      const isNotSentToCA = !isReturned && !hasDateSentToCA;
+      const peStat = (p.peStatus || '').trim();
+      const isPendingWithCA = isSentToCA && peStat === '';
+      const isPeAction = isSentToCA && peStat !== '';
+      const peNorm = normalizePeStatus(p.peStatus);
+
+      if (isSentToCA) proposalsSentToCA++;
+      if (isNotSentToCA) proposalsNotSentToCA++;
+      if (isReturned) proposalsBackToDist++;
+      if (isPendingWithCA) {
+        proposalsPendingWithCA++;
+        const pDispatchDate = p.proposalSentDate || p.createdAt;
+        const sentTime = pDispatchDate ? new Date(pDispatchDate).getTime() : nowMs;
+        const days = isNaN(sentTime) ? 0 : Math.max(0, Math.floor((nowMs - sentTime) / (1000 * 60 * 60 * 24)));
+        pendingPetitionsAging.push(days);
+      }
+      if (isPeAction) proposalsPeActionTaken++;
+
+      if (isSentToCA) {
+        if (peNorm === 'Registered FIR') proposalsFirRegistered++;
+        else if (peNorm === 'Register FIR') proposalsRegisterFir++;
+        else if (peNorm === 'PE Pending') proposalsPePending++;
+        else if (peNorm === 'Close') proposalsClosed++;
+        else if (peNorm === 'Recommended to DE') proposalsRecommendedDE++;
+        else if (peNorm === 'High Court Stay') proposalsHCStay++;
+      }
+
+      if (peNorm) {
+        peStatusCounts[peNorm] = (peStatusCounts[peNorm] || 0) + 1;
+      }
+
+      const pKey = isReturned ? 'Returned to District' : (isSentToCA ? 'Sent to CA' : 'Pending at HQ');
+      proposalStatusCounts[pKey] = (proposalStatusCounts[pKey] || 0) + 1;
+
+      const resps = p.respondents || [];
+      const hasObtain = resps.some(r => (r.permissionStatus || '').toLowerCase() === 'obtain');
+      const hasReject = resps.some(r => (r.permissionStatus || '').toLowerCase() === 'reject');
+      if (isSentToCA && hasObtain) proposalsSanctionsObtained++;
+      if (isSentToCA && hasReject) proposalsSanctionsRejected++;
+
+      // Department aggregation: count at most once per petition for each department
+      const uniqueDepts = new Set(resps.map(r => (r.department || '').trim()).filter(Boolean));
       uniqueDepts.forEach(dept => {
         departmentCounts[dept] = (departmentCounts[dept] || 0) + 1;
       });
-    });
 
-    allRespondents.forEach(r => {
-      const rawStatus = (r.permissionStatus || '').trim().toLowerCase();
-      let displayStatus = 'Awaiting Sanction (Pending)';
-      if (rawStatus === 'obtain') {
-        displayStatus = 'Permission Obtained';
-        permissionsObtained++;
-      } else if (rawStatus === 'reject') {
-        displayStatus = 'Permission Rejected';
-        permissionsRejected++;
-      } else {
-        permissionsPending++;
-      }
-      permissionStatusCounts[displayStatus] = (permissionStatusCounts[displayStatus] || 0) + 1;
+      // Process Respondents
+      resps.forEach(r => {
+        respondentsTotal++;
+        const rSentDate = r.permissionSentDate || p.proposalSentDate;
+        const rHasDate = Boolean(rSentDate && String(rSentDate).trim() !== '');
+        const rStat = (r.permissionStatus || 'Pending').toLowerCase();
 
-      // Track all respondents in the CA Watchlist / Status Tracker
-      const dispatchDate = r.permissionSentDate || r.petition?.proposalSentDate;
-      const sentTime = dispatchDate ? new Date(dispatchDate).getTime() : new Date(r.createdAt).getTime();
-      const daysPending = Math.max(0, Math.floor((nowMs - sentTime) / (1000 * 60 * 60 * 24)));
-      
-      let urgency = 'normal';
-      if (rawStatus === 'obtain') {
-        urgency = 'obtained';
-      } else if (daysPending >= 60) {
-        urgency = 'critical';
-      } else if (daysPending >= 30) {
-        urgency = 'warning';
-      }
+        if (isReturned) {
+          respondentsBackToDist++;
+        } else if (!rHasDate) {
+          respondentsNotSentToCA++;
+        } else {
+          respondentsSentToCA++;
+          if (rStat === 'obtain') {
+            respondentsObtained++;
+            permissionStatusCounts['Permission Obtained']++;
+          } else if (rStat === 'reject') {
+            respondentsRejected++;
+            permissionStatusCounts['Permission Rejected']++;
+          } else {
+            respondentsPendingWithCA++;
+            permissionStatusCounts['Awaiting Sanction (Pending)']++;
+          }
 
-      caAgingList.push({
-        id: r.id,
-        petitionId: r.petition?.id,
-        petitionNo: r.petition?.petitionNo || 'N/A',
-        district: r.petition?.district || 'N/A',
-        respondentName: r.name,
-        designation: r.designation || 'N/A',
-        office: r.office || 'N/A',
-        department: r.department || 'N/A',
-        caDesignation: r.caDesignation || 'Competent Authority',
-        caDepartment: r.caDepartment || r.department || 'N/A',
-        caPlace: r.caPlace || 'N/A',
-        permissionSentDate: dispatchDate,
-        permissionStatus: rawStatus === 'obtain' ? 'Obtained' : rawStatus === 'reject' ? 'Rejected' : 'Pending',
-        daysPending,
-        urgency
+          if (peNorm === 'Registered FIR') respondentsFirRegistered++;
+          else if (peNorm === 'Register FIR') respondentsRegisterFir++;
+          else if (peNorm === 'PE Pending') respondentsPePending++;
+          else if (peNorm === 'Recommended to DE') respondentsRecommendedDE++;
+          else if (peNorm === 'Close') respondentsClosed++;
+          else if (peNorm === 'High Court Stay') respondentsHCStay++;
+        }
+
+        // Add to CA Watchlist if sent to CA and pending decision
+        if (isSentToCA && rHasDate && rStat !== 'obtain' && rStat !== 'reject') {
+          const sentTime = rSentDate ? new Date(rSentDate).getTime() : nowMs;
+          const daysPending = isNaN(sentTime) ? 0 : Math.max(0, Math.floor((nowMs - sentTime) / (1000 * 60 * 60 * 24)));
+          let urgency = 'normal';
+          if (daysPending >= 60) urgency = 'critical';
+          else if (daysPending >= 30) urgency = 'warning';
+
+          caAgingList.push({
+            id: r.id,
+            petitionId: p.id,
+            petitionNo: p.petitionNo || 'N/A',
+            district: p.district || 'N/A',
+            respondentName: r.name,
+            designation: r.designation || 'N/A',
+            office: r.office || 'N/A',
+            department: r.department || 'N/A',
+            caDesignation: r.caDesignation || 'Competent Authority',
+            caDepartment: r.caDepartment || r.department || 'N/A',
+            caPlace: r.caPlace || 'N/A',
+            permissionSentDate: rSentDate,
+            permissionStatus: 'Pending',
+            daysPending,
+            urgency
+          });
+        }
       });
     });
 
     caAgingList.sort((a, b) => b.daysPending - a.daysPending);
+
+    // Aging Counts
+    const criticalPetitionCount = pendingPetitionsAging.filter(d => d >= 60).length;
+    const warningPetitionCount = pendingPetitionsAging.filter(d => d >= 30 && d < 60).length;
+    const criticalRespondentCount = caAgingList.filter(c => c.daysPending >= 60).length;
+    const warningRespondentCount = caAgingList.filter(c => c.daysPending >= 30 && c.daysPending < 60).length;
 
     // District-wise comparative breakdown
     const districtPetitionsMap = {};
@@ -613,11 +732,10 @@ router.get('/analytics', async (req, res) => {
       value
     }));
 
-    // Monthly Timeline Trend (Last 6-12 months)
+    // Monthly Timeline Trend (Last 6 calendar months)
     const monthsMap = {};
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-    // Initialize past 6 calendar months
     const today = new Date();
     for (let i = 5; i >= 0; i--) {
       const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
@@ -648,13 +766,22 @@ router.get('/analytics', async (req, res) => {
 
     const monthlyTrends = Object.values(monthsMap);
 
-    // Pipeline Funnel data
+    // Pipeline Funnel data for Proposals
     const pipelineFunnel = [
       { step: '1. Petitions Registered', count: totalPetitions, color: '#3B82F6', percentage: 100 },
-      { step: '2. Proposals Sent to CA', count: proposalsSentCount || Math.min(totalPetitions, acceptedProposals + pendingProposals), color: '#8B5CF6', percentage: totalPetitions ? Math.round(((proposalsSentCount || acceptedProposals) / totalPetitions) * 100) : 0 },
-      { step: '3. CA Sanctions Obtained', count: permissionsObtained, color: '#10B981', percentage: totalPetitions ? Math.round((permissionsObtained / totalPetitions) * 100) : 0 },
-      { step: '4. Preliminary Enquiry (PE)', count: peInitiatedCount || (totalPetitions ? Math.max(1, firRegistered) : 0), color: '#F59E0B', percentage: totalPetitions ? Math.round((peInitiatedCount / totalPetitions) * 100) : 0 },
-      { step: '5. FIRs Registered', count: firRegistered, color: '#EF4444', percentage: totalPetitions ? Math.round((firRegistered / totalPetitions) * 100) : 0 }
+      { step: '2. Proposals Sent to CA', count: proposalsSentToCA, color: '#8B5CF6', percentage: totalPetitions ? Math.round((proposalsSentToCA / totalPetitions) * 100) : 0 },
+      { step: '3. Sanctions Obtained', count: proposalsSanctionsObtained, color: '#10B981', percentage: totalPetitions ? Math.round((proposalsSanctionsObtained / totalPetitions) * 100) : 0 },
+      { step: '4. PE Action Taken', count: proposalsPeActionTaken, color: '#F59E0B', percentage: totalPetitions ? Math.round((proposalsPeActionTaken / totalPetitions) * 100) : 0 },
+      { step: '5. FIRs Registered', count: (proposalsFirRegistered + proposalsRegisterFir), color: '#EF4444', percentage: totalPetitions ? Math.round(((proposalsFirRegistered + proposalsRegisterFir) / totalPetitions) * 100) : 0 }
+    ];
+
+    // Pipeline Funnel data for Respondents
+    const respondentsPipelineFunnel = [
+      { step: '1. Accused Registered', count: respondentsTotal, color: '#3B82F6', percentage: 100 },
+      { step: '2. Accused Sent to CA', count: respondentsSentToCA, color: '#8B5CF6', percentage: respondentsTotal ? Math.round((respondentsSentToCA / respondentsTotal) * 100) : 0 },
+      { step: '3. CA Sanctions Obtained', count: respondentsObtained, color: '#10B981', percentage: respondentsTotal ? Math.round((respondentsObtained / respondentsTotal) * 100) : 0 },
+      { step: '4. PE Outcome Decided', count: (respondentsFirRegistered + respondentsRegisterFir + respondentsPePending + respondentsClosed + respondentsHCStay), color: '#F59E0B', percentage: respondentsTotal ? Math.round(((respondentsFirRegistered + respondentsRegisterFir + respondentsPePending + respondentsClosed + respondentsHCStay) / respondentsTotal) * 100) : 0 },
+      { step: '5. FIRs Registered', count: (respondentsFirRegistered + respondentsRegisterFir), color: '#EF4444', percentage: respondentsTotal ? Math.round(((respondentsFirRegistered + respondentsRegisterFir) / respondentsTotal) * 100) : 0 }
     ];
 
     // Recent Petitions list
@@ -670,40 +797,57 @@ router.get('/analytics', async (req, res) => {
       createdAt: p.createdAt
     }));
 
-    // Statutory pending counts
-    const criticalPendingCount = caAgingList.filter(c => c.urgency === 'critical').length;
-    const warningPendingCount = caAgingList.filter(c => c.urgency === 'warning').length;
+    const totalFir = proposalsFirRegistered + proposalsRegisterFir;
 
     const analyticsResult = {
       districts: allDistricts.map(d => d.name),
       selectedDistrict: targetDistrict || 'ALL',
       overview: {
+        // Proposals / Petitions (Primary)
         totalPetitions,
-        acceptedProposals,
-        rejectedProposals,
-        pendingProposals,
-        permissionsObtained,
-        permissionsPending,
-        permissionsRejected,
-        firRegistered,
-        regularEnquiries,
-        casesClosed,
+        proposalsSentToCA,
+        proposalsNotSentToCA,
+        proposalsBackToDist,
+        acceptedProposals: proposalsSentToCA, // backwards-compatible mapping
+        pendingProposals: proposalsPendingWithCA,
+        proposalsPendingWithCA,
+        peActionTaken: proposalsPeActionTaken,
+        firRegistered: totalFir,
+        proposalsSanctionsObtained,
+        proposalsSanctionsRejected,
         totalOfficers: activeOfficers.length,
-        totalRespondents: allRespondents.length,
-        acceptanceRate: totalPetitions ? Math.round((acceptedProposals / totalPetitions) * 100) : 0,
-        permissionRate: allRespondents.length ? Math.round((permissionsObtained / allRespondents.length) * 100) : 0,
-        firRate: totalPetitions ? Math.round((firRegistered / totalPetitions) * 100) : 0,
-        criticalPendingCount,
-        warningPendingCount,
-        totalPendingCa: caAgingList.length
+        criticalPendingCount: criticalPetitionCount,
+        warningPendingCount: warningPetitionCount,
+        totalPendingCa: proposalsPendingWithCA, // Exact 181 proposals!
+        
+        // Respondents / Accused
+        totalRespondents: respondentsTotal, // 1,005
+        respondentsSentToCA, // 906
+        respondentsNotSentToCA, // 21
+        respondentsBackToDist, // 78
+        respondentsPendingWithCA, // 610
+        permissionsObtained: respondentsObtained, // 259
+        permissionsPending: respondentsPendingWithCA, // 610
+        permissionsRejected: respondentsRejected, // 37
+        respondentsFirRegistered: (respondentsFirRegistered + respondentsRegisterFir),
+        respondentsCriticalPendingCount: criticalRespondentCount, // 565
+        respondentsWarningPendingCount: warningRespondentCount, // 35
+        totalPendingRespondents: respondentsPendingWithCA, // 610
+        
+        // Rates
+        acceptanceRate: totalPetitions ? Math.round((proposalsSentToCA / totalPetitions) * 100) : 0,
+        sanctionRate: proposalsSentToCA ? Math.round((proposalsSanctionsObtained / proposalsSentToCA) * 100) : 0,
+        firRate: totalPetitions ? Math.round((totalFir / totalPetitions) * 100) : 0,
+        permissionRate: respondentsSentToCA ? Math.round((respondentsObtained / respondentsSentToCA) * 100) : 0
       },
       pipelineFunnel,
+      respondentsPipelineFunnel,
       districtBreakdown: districtBreakdown.filter(d => d.totalActivity > 0 || districtBreakdown.indexOf(d) < 10),
       topDepartments,
       permissionChartData,
       peChartData,
       monthlyTrends,
-      statutoryAgingWatchlist: caAgingList.slice(0, 10),
+      statutoryAgingWatchlist: caAgingList.slice(0, 30),
       recentPetitions
     };
 

@@ -1,17 +1,23 @@
 const express = require('express');
 const router = express.Router();
 const prisma = require('../prismaClient');
+const redisClient = require('../redisClient');
 const { authMiddleware, adminMiddleware } = require('./auth');
 
 // Any authenticated user can read the district master (needed for the petition form)
 router.use(authMiddleware);
 
-// List all districts
+// List all districts (cached for fast dropdowns)
 router.get('/', async (req, res) => {
   try {
+    const cached = await redisClient.get('districts:all');
+    if (cached) return res.json(JSON.parse(cached));
+
     const districts = await prisma.district.findMany({
       orderBy: { name: 'asc' }
     });
+
+    await redisClient.setEx('districts:all', 300, JSON.stringify(districts));
     res.json(districts);
   } catch (error) {
     console.error('Fetch districts error:', error);
@@ -53,6 +59,7 @@ router.post('/', adminMiddleware, async (req, res) => {
       }
     });
 
+    await redisClient.del('districts:all');
     res.status(201).json(district);
   } catch (error) {
     if (error.code === 'P2002') {
@@ -89,6 +96,7 @@ router.put('/:id', adminMiddleware, async (req, res) => {
       }
     });
 
+    await redisClient.del('districts:all');
     res.json(district);
   } catch (error) {
     if (error.code === 'P2025') {
@@ -106,6 +114,7 @@ router.put('/:id', adminMiddleware, async (req, res) => {
 router.delete('/:id', adminMiddleware, async (req, res) => {
   try {
     await prisma.district.delete({ where: { id: req.params.id } });
+    await redisClient.del('districts:all');
     res.status(204).send();
   } catch (error) {
     if (error.code === 'P2025') {

@@ -127,16 +127,13 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments,
   const isAdminNewPetition = isAdmin && !isEdit;
   const isAdminEdit = isAdmin && isEdit;
 
-  // Section Visibilities and Editability
-  const canEditIandII = isAdmin || status === 'DRAFT' || (status === '17A_RETURNED' && isCreator);
-  const showIII = isAdmin || (status !== 'DRAFT' && status !== '17A_RETURNED');
-  const canEditIII = isAdmin || ((status === 'SUBMITTED_TO_SUPERVISOR') && isSupervisor);
-  const showIV = isAdmin || ['17A_ACCEPTED', 'CA_SUBMITTED', '17A_PERMISSION_PENDING', '17A_PERMISSION_COMPLETED', 'PRELIMINARY_ENQUIRY_SUBMITTED'].includes(status);
-  const canEditIV = isAdmin || ((status === '17A_ACCEPTED') && isSupervisor);
-  const showV = isAdmin || ['CA_SUBMITTED', '17A_PERMISSION_PENDING', '17A_PERMISSION_COMPLETED', 'PRELIMINARY_ENQUIRY_SUBMITTED'].includes(status);
-  const canEditV = isAdmin || ((status === 'CA_SUBMITTED' || status === '17A_PERMISSION_PENDING') && isSupervisor);
-  const showVI = isAdmin || ['17A_PERMISSION_COMPLETED', 'PRELIMINARY_ENQUIRY_SUBMITTED'].includes(status);
-  const canEditVI = isAdmin || ((status === '17A_PERMISSION_COMPLETED') && isCreator);
+  const initialReturnRemarks = useMemo(() => {
+    if (initialData?.remarks && initialData.remarks.length > 0) {
+      return initialData.remarks[initialData.remarks.length - 1].text || '';
+    }
+    const histReturn = initialData?.history?.find(h => h.remarks && (h.action?.includes('RETURN') || h.action === 'ADMIN_UPDATE'));
+    return histReturn?.remarks || '';
+  }, [initialData]);
 
   const { register, control, watch, setValue, getValues, formState: { isSubmitting } } = useForm({
     defaultValues: isEdit ? {
@@ -156,6 +153,7 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments,
       })),
       proposalStatus: initialData.proposalStatus || '',
       proposalSentDate: toDateInput(initialData.proposalSentDate),
+      returnRemarks: isEdit ? initialReturnRemarks : '',
       peNo: initialData.peNo || '',
       peRegDate: toDateInput(initialData.peRegDate),
       peReportSentDate: toDateInput(initialData.peReportSentDate),
@@ -165,14 +163,31 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments,
     } : {
       district: isAdminNewPetition ? '' : (localStorage.getItem('isHeadOffice') !== '1' ? (localStorage.getItem('districtName') || '') : ''), 
       petitionNo: '', type: '', petitionerName: '', petitionerAddress: '', sirOfficerName: '', officerRank: '', status: 'DRAFT', respondents: [], sirEo: '', sirEoDesignation: '',
-      proposalStatus: '', proposalSentDate: '',
+      proposalStatus: '', proposalSentDate: '', returnRemarks: '',
       peNo: '', peRegDate: '', peReportSentDate: '', peStatus: '',
     }
   });
 
+  const watchedProposalStatus = watch('proposalStatus');
+  const isReturnedWithRemarks = useMemo(() => {
+    const s = (watchedProposalStatus || '').trim().toLowerCase();
+    return s.includes('returned') || s === 'returned with remarks';
+  }, [watchedProposalStatus]);
+
+  // Section Visibilities and Editability
+  const canEditIandII = isAdmin || status === 'DRAFT' || (status === '17A_RETURNED' && isCreator);
+  const showIII = isAdmin || (status !== 'DRAFT' && status !== '17A_RETURNED') || isReturnedWithRemarks || !!initialData?.proposalStatus;
+  const canEditIII = isAdmin || ((status === 'SUBMITTED_TO_SUPERVISOR') && isSupervisor);
+  const showIV = !isReturnedWithRemarks && (isAdmin || ['17A_ACCEPTED', 'CA_SUBMITTED', '17A_PERMISSION_PENDING', '17A_PERMISSION_COMPLETED', 'PRELIMINARY_ENQUIRY_SUBMITTED'].includes(status));
+  const canEditIV = isAdmin || ((status === '17A_ACCEPTED') && isSupervisor);
+  const showV = !isReturnedWithRemarks && (isAdmin || ['CA_SUBMITTED', '17A_PERMISSION_PENDING', '17A_PERMISSION_COMPLETED', 'PRELIMINARY_ENQUIRY_SUBMITTED'].includes(status));
+  const canEditV = isAdmin || ((status === 'CA_SUBMITTED' || status === '17A_PERMISSION_PENDING') && isSupervisor);
+  const showVI = !isReturnedWithRemarks && (isAdmin || ['17A_PERMISSION_COMPLETED', 'PRELIMINARY_ENQUIRY_SUBMITTED'].includes(status));
+  const canEditVI = isAdmin || ((status === '17A_PERMISSION_COMPLETED') && isCreator);
+
   const { fields: respondentFields, append: appendRespondent, remove: removeRespondent } = useFieldArray({ control, name: "respondents" });
   const [newResp, setNewResp] = useState({ name: '', designation: '', office: '', department: '', subDepartment: '' });
-  const [actionRemarks, setActionRemarks] = useState('');
+  const [actionRemarks, setActionRemarks] = useState(initialReturnRemarks);
   const [errorMsg, setErrorMsg] = useState('');
 
   // Parse initial petition number if formatted (e.g. KL/HO/BGK/COM/0001/2026 or KL/ACB/HO/BGK/COM/0001/2026)
@@ -439,6 +454,13 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments,
       }
       if (!data.petitionerName) return setErrorMsg('Name of the Petitioner is required.');
       if (data.respondents.length === 0) return setErrorMsg('At least one respondent is required.');
+
+      if (isReturnedWithRemarks) {
+        if (!data.returnRemarks || !data.returnRemarks.trim()) {
+          return setErrorMsg('Remarks / Reason for Return are required when Proposal Status is "Returned with remarks".');
+        }
+        data.proposalSentDate = null;
+      }
     }
     if (actionType === 'RETURN_17A' && !actionRemarks) return setErrorMsg('Remarks are required to return.');
     if (actionType === 'SUBMIT_CA') {
@@ -989,28 +1011,52 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments,
             </h4>
             {isAdmin ? (
               /* Admin: direct data-entry & edit in all states */
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[12.5px] font-semibold text-ink-text-soft">Proposal Status</label>
-                  <select className="app-input" {...register('proposalStatus')}>
-                    <option value="">Select status</option>
-                    {proposalStatuses.length > 0 ? (
-                      proposalStatuses.map(s => (
-                        <option key={s.id || s.name} value={s.name}>{s.name}</option>
-                      ))
-                    ) : (
-                      <>
-                        <option value="Accept">Accept</option>
-                        <option value="Pending">Pending</option>
-                        <option value="Returned with remarks">Returned with remarks</option>
-                      </>
-                    )}
-                  </select>
+              <div className="flex flex-col gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[12.5px] font-semibold text-ink-text-soft">Proposal Status</label>
+                    <select className="app-input" {...register('proposalStatus')}>
+                      <option value="">Select status</option>
+                      {proposalStatuses.length > 0 ? (
+                        proposalStatuses.map(s => (
+                          <option key={s.id || s.name} value={s.name}>{s.name}</option>
+                        ))
+                      ) : (
+                        <>
+                          <option value="Accept">Accept</option>
+                          <option value="Pending">Pending</option>
+                          <option value="Returned with remarks">Returned with remarks</option>
+                        </>
+                      )}
+                    </select>
+                  </div>
+                  {!isReturnedWithRemarks && (
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[12.5px] font-semibold text-ink-text-soft">Date Sent to CA</label>
+                      <input type="date" className="app-input" {...register('proposalSentDate')} />
+                    </div>
+                  )}
                 </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[12.5px] font-semibold text-ink-text-soft">Date Sent to CA</label>
-                  <input type="date" className="app-input" {...register('proposalSentDate')} />
-                </div>
+
+                {isReturnedWithRemarks && (
+                  <div className="p-4 bg-amber-50/80 border border-amber-300 rounded-lg shadow-2xs">
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[12.5px] font-bold text-amber-950 flex items-center gap-1.5">
+                        <AlertCircle className="w-4 h-4 text-amber-700" />
+                        Remarks / Reason for Return (Required / ಹಿಂಬರಹದ ವಿವರಗಳು) *
+                      </label>
+                      <textarea
+                        className="app-input bg-white min-h-[85px] text-[13px] border-amber-300 focus:border-amber-500 focus:ring-amber-500/20"
+                        rows={3}
+                        placeholder="Enter the detailed remarks or reasons for returning proposal to the district unit..."
+                        {...register('returnRemarks')}
+                      />
+                      <p className="text-[11.5px] text-amber-800 font-medium">
+                        * When "Returned with remarks" is selected, the proposal is returned to the district unit. Competent Authority (CA) and Preliminary Enquiry sections below are hidden.
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             ) : canEditIII ? (
               <div className="p-4 bg-parchment border border-dashed border-rule rounded-s">

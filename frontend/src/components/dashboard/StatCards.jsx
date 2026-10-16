@@ -6,80 +6,205 @@ import {
   ShieldCheck, 
   Gavel, 
   AlertTriangle, 
-  Clock
+  Clock,
+  Users,
+  Send,
+  AlertCircle
 } from 'lucide-react';
 
-export default function StatCards({ overview = {}, onFilterPendingCa }) {
+export default function StatCards({ overview = {}, onFilterPendingCa, viewMode = 'proposals' }) {
+  const isRespondents = viewMode === 'respondents';
+
   const {
+    // Proposal-level metrics
     totalPetitions = 0,
-    acceptedProposals = 0,
-    permissionsObtained = 0,
+    proposalsSentToCA = 0,
+    proposalsNotSentToCA = 0,
+    proposalsBackToDist = 0,
+    proposalsPendingWithCA = 0,
+    proposalsSanctionsObtained = 0,
+    proposalsSanctionsRejected = 0,
     firRegistered = 0,
-    acceptanceRate = 0,
-    permissionRate = 0,
-    firRate = 0,
     criticalPendingCount = 0,
-    totalPendingCa = 0
+    warningPendingCount = 0,
+    totalPendingCa = 0,
+
+    // Respondent-level metrics
+    totalRespondents = 0,
+    respondentsSentToCA = 0,
+    respondentsNotSentToCA = 0,
+    respondentsBackToDist = 0,
+    respondentsPendingWithCA = 0,
+    permissionsObtained = 0,
+    permissionsRejected = 0,
+    respondentsFirRegistered = 0,
+    respondentsCriticalPendingCount = 0,
+    respondentsWarningPendingCount = 0,
+
+    // Rates
+    acceptanceRate = 0,
+    sanctionRate = 0,
+    firRate = 0,
+    permissionRate = 0
   } = overview;
 
-  const cards = [
+  const proposalCards = [
     {
       id: 'petitions',
       label: 'Total Petitions Registered',
+      sublabel: 'Active Registry',
       value: totalPetitions,
       icon: FileText,
       accent: '#60A5FA',
       badge: 'Active Registry',
       badgeColor: 'bg-white/20 text-white border-white/30',
+      footerNote: `${proposalsSentToCA} Dispatched • ${proposalsNotSentToCA} Awaiting • ${proposalsBackToDist} Returned`,
       to: '/register'
     },
     {
       id: 'proposals',
-      label: '17-A Proposals Accepted',
-      value: acceptedProposals,
-      icon: CheckCircle2,
+      label: 'Proposals Sent to CA',
+      sublabel: 'Dispatched to Authority',
+      value: proposalsSentToCA,
+      icon: Send,
       accent: '#34D399',
-      badge: `${acceptanceRate}% Accepted`,
+      badge: `${totalPetitions ? Math.round((proposalsSentToCA / totalPetitions) * 100) : 0}% Dispatched`,
       badgeColor: 'bg-emerald-400/25 text-white border-emerald-300/40',
-      progressBar: { value: acceptanceRate, color: 'bg-emerald-400' },
+      progressBar: { 
+        value: totalPetitions ? Math.round((proposalsSentToCA / totalPetitions) * 100) : 0, 
+        color: 'bg-emerald-400' 
+      },
+      footerNote: `${proposalsNotSentToCA} Awaiting Dispatch • ${proposalsBackToDist} Returned to Dist`,
       to: '/register'
     },
     {
       id: 'permissions',
-      label: 'CA Permissions Obtained',
-      value: permissionsObtained,
+      label: 'CA Sanctions Obtained',
+      sublabel: 'Authority Decision Granted',
+      value: proposalsSanctionsObtained,
       icon: ShieldCheck,
       accent: '#FBBF24',
-      badge: 'Approved',
+      badge: `${proposalsSentToCA ? Math.round((proposalsSanctionsObtained / proposalsSentToCA) * 100) : 0}% Granted`,
       badgeColor: 'bg-amber-400/25 text-white border-amber-300/40',
-      progressBar: { value: permissionRate, color: 'bg-amber-400' },
+      progressBar: { 
+        value: proposalsSentToCA ? Math.round((proposalsSanctionsObtained / proposalsSentToCA) * 100) : 0, 
+        color: 'bg-amber-400' 
+      },
+      footerNote: `${proposalsSanctionsObtained} Sanctioned • ${proposalsSanctionsRejected} Refused / Disposed`,
       to: '/register'
     },
     {
       id: 'firs',
       label: 'FIRs Registered',
+      sublabel: 'Criminal Prosecution Initiated',
       value: firRegistered,
       icon: Gavel,
       accent: '#F87171',
       badge: 'Prosecution Active',
       badgeColor: 'bg-red-400/25 text-white border-red-300/40',
-      progressBar: { value: firRate, color: 'bg-red-400' },
+      progressBar: { 
+        value: totalPetitions ? Math.round((firRegistered / totalPetitions) * 100) : 0, 
+        color: 'bg-red-400' 
+      },
+      footerNote: `${firRegistered} Cases Registered in Lokayukta Police Stations`,
       to: '/register'
     },
     {
       id: 'pending-ca',
       label: 'CA Pending Cases',
-      value: totalPendingCa,
+      sublabel: 'Awaiting Competent Authority Order',
+      value: proposalsPendingWithCA || totalPendingCa,
       icon: criticalPendingCount > 0 ? AlertTriangle : Clock,
       accent: criticalPendingCount > 0 ? '#FB923C' : '#FBBF24',
-      badge: criticalPendingCount > 0 ? `${criticalPendingCount} Overdue >60d` : `${totalPendingCa} Under Review`,
+      badge: criticalPendingCount > 0 ? `${criticalPendingCount} Overdue >60d` : `${proposalsPendingWithCA} Under Review`,
       badgeColor: criticalPendingCount > 0 
         ? 'bg-rose-500/40 text-white border-rose-300/50 animate-pulse' 
         : 'bg-amber-400/25 text-white border-amber-300/40',
+      footerNote: `${criticalPendingCount} Critical (>60d) • ${warningPendingCount} Warning (30-59d)`,
       onClick: onFilterPendingCa,
       isAction: true
     }
   ];
+
+  const respondentCards = [
+    {
+      id: 'respondents-total',
+      label: 'Total Accused Registered',
+      sublabel: 'Public Servants Registry',
+      value: totalRespondents,
+      icon: Users,
+      accent: '#60A5FA',
+      badge: 'Named Accused',
+      badgeColor: 'bg-white/20 text-white border-white/30',
+      footerNote: `${respondentsSentToCA} Dispatched • ${respondentsNotSentToCA} Awaiting • ${respondentsBackToDist} Returned`,
+      to: '/register'
+    },
+    {
+      id: 'respondents-sent',
+      label: 'Accused Sent to CA',
+      sublabel: 'Sanction Requests Dispatched',
+      value: respondentsSentToCA,
+      icon: Send,
+      accent: '#34D399',
+      badge: `${totalRespondents ? Math.round((respondentsSentToCA / totalRespondents) * 100) : 0}% Dispatched`,
+      badgeColor: 'bg-emerald-400/25 text-white border-emerald-300/40',
+      progressBar: { 
+        value: totalRespondents ? Math.round((respondentsSentToCA / totalRespondents) * 100) : 0, 
+        color: 'bg-emerald-400' 
+      },
+      footerNote: `${respondentsNotSentToCA} Awaiting Dispatch • ${respondentsBackToDist} Returned to Dist`,
+      to: '/register'
+    },
+    {
+      id: 'respondents-obtained',
+      label: 'CA Sanctions Obtained',
+      sublabel: 'Approved by Competent Authority',
+      value: permissionsObtained,
+      icon: ShieldCheck,
+      accent: '#FBBF24',
+      badge: `${respondentsSentToCA ? Math.round((permissionsObtained / respondentsSentToCA) * 100) : 0}% Approved`,
+      badgeColor: 'bg-amber-400/25 text-white border-amber-300/40',
+      progressBar: { 
+        value: respondentsSentToCA ? Math.round((permissionsObtained / respondentsSentToCA) * 100) : 0, 
+        color: 'bg-amber-400' 
+      },
+      footerNote: `${permissionsObtained} Sanctioned • ${permissionsRejected} Rejected by CA`,
+      to: '/register'
+    },
+    {
+      id: 'respondents-firs',
+      label: 'Accused in FIRs',
+      sublabel: 'Charges Registered',
+      value: respondentsFirRegistered,
+      icon: Gavel,
+      accent: '#F87171',
+      badge: 'Prosecution Active',
+      badgeColor: 'bg-red-400/25 text-white border-red-300/40',
+      progressBar: { 
+        value: totalRespondents ? Math.round((respondentsFirRegistered / totalRespondents) * 100) : 0, 
+        color: 'bg-red-400' 
+      },
+      footerNote: `${respondentsFirRegistered} Public Servants Indicted in FIRs`,
+      to: '/register'
+    },
+    {
+      id: 'respondents-pending-ca',
+      label: 'Accused Awaiting CA',
+      sublabel: 'Pending CA Sanction Decision',
+      value: respondentsPendingWithCA,
+      icon: respondentsCriticalPendingCount > 0 ? AlertTriangle : Clock,
+      accent: respondentsCriticalPendingCount > 0 ? '#FB923C' : '#FBBF24',
+      badge: respondentsCriticalPendingCount > 0 ? `${respondentsCriticalPendingCount} Overdue >60d` : `${respondentsPendingWithCA} In Review`,
+      badgeColor: respondentsCriticalPendingCount > 0 
+        ? 'bg-rose-500/40 text-white border-rose-300/50 animate-pulse' 
+        : 'bg-amber-400/25 text-white border-amber-300/40',
+      footerNote: `${respondentsCriticalPendingCount} Critical (>60d) • ${respondentsWarningPendingCount} Warning (30-59d)`,
+      onClick: onFilterPendingCa,
+      isAction: true
+    }
+  ];
+
+  const cards = isRespondents ? respondentCards : proposalCards;
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
@@ -115,24 +240,29 @@ export default function StatCards({ overview = {}, onFilterPendingCa }) {
 
               {/* Number and Label */}
               <div className="font-serif text-3xl font-bold text-white tracking-tight mb-1">
-                {card.value}
+                {typeof card.value === 'number' ? card.value.toLocaleString('en-IN') : card.value}
               </div>
               <div className="text-[11.5px] font-bold uppercase tracking-wider text-[#E0F2FE]">
                 {card.label}
               </div>
             </div>
 
-            {/* Bottom section: Progress bar only */}
-            {card.progressBar && (
-              <div className="mt-3 pt-2.5 border-t border-white/20">
+            {/* Middle/Bottom section: Progress bar or footer note */}
+            <div className="mt-3 pt-2.5 border-t border-white/20 space-y-2">
+              {card.progressBar && (
                 <div className="w-full bg-black/25 h-1.5 rounded-full overflow-hidden border border-white/10">
                   <div 
                     className={`h-full rounded-full ${card.progressBar.color} transition-all duration-500`}
                     style={{ width: `${Math.min(100, Math.max(5, card.progressBar.value))}%` }}
                   />
                 </div>
-              </div>
-            )}
+              )}
+              {card.footerNote && (
+                <div className="text-[10px] text-blue-100/80 font-mono truncate" title={card.footerNote}>
+                  {card.footerNote}
+                </div>
+              )}
+            </div>
           </div>
         );
 

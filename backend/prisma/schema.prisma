@@ -9,7 +9,7 @@ datasource db {
 }
 
 model User {
-  id              String    @id @default(uuid())
+  id                      String       @id @default(uuid())
   email                   String       @unique @map("username")
   password                String
   fullName                String?
@@ -30,13 +30,20 @@ model User {
   supervisees             User[]       @relation("UserSupervisor")
   district                District?    @relation(fields: [districtId], references: [id])
 
-  officersCreated Officer[] @relation("OfficerCreatedBy")
-  officersUpdated Officer[] @relation("OfficerUpdatedBy")
+  officersCreated         Officer[]    @relation("OfficerCreatedBy")
+  officersUpdated         Officer[]    @relation("OfficerUpdatedBy")
 
-  petitionsCreated Petition[] @relation("PetitionCreatedBy")
-  petitionsUpdated Petition[] @relation("PetitionUpdatedBy")
+  petitionsCreated        Petition[]   @relation("PetitionCreatedBy")
+  petitionsUpdated        Petition[]   @relation("PetitionUpdatedBy")
 
-  historyActions   PetitionHistory[] @relation("HistoryActionBy")
+  historyActions          PetitionHistory[] @relation("HistoryActionBy")
+
+  editRequestsRequested   EditRequest[] @relation("EditRequest_requestedByIdToUser")
+  editRequestsReviewed    EditRequest[] @relation("EditRequest_reviewedByIdToUser")
+
+  @@index([districtId])
+  @@index([designationId])
+  @@index([isActive])
 }
 
 model Designation {
@@ -52,6 +59,7 @@ model Designation {
   usersAsSupervisor User[]    @relation("UserSupervisorDesignation")
 
   @@unique([districtId, name])
+  @@index([districtId])
 }
 
 model District {
@@ -120,32 +128,42 @@ model OfficerPreviousPlace {
 }
 
 model Petition {
-  id               String       @id @default(uuid())
-  district         String
-  petitionNo       String       @unique
-  petitionerName   String
+  id                String            @id @default(uuid())
+  district          String
+  petitionNo        String            @unique
+  petitionerName    String
   petitionerAddress String?
-  type             String?      @default("Complaint")
-  sirOfficerName   String?
-  officerRank      String?
-  proposalStatus   String?
-  proposalSentDate DateTime?
-  peNo             String?
-  peRegDate        DateTime?
-  peReportSentDate DateTime?
-  peStatus         String?
-  sirEo            String?
-  sirEoDesignation String?
-  status           String       @default("DRAFT")
-  createdById      String?
-  updatedById      String?
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
-  createdBy        User?        @relation("PetitionCreatedBy", fields: [createdById], references: [id])
-  updatedBy        User?        @relation("PetitionUpdatedBy", fields: [updatedById], references: [id])
-  remarks          Remark[]
-  respondents      Respondent[]
-  history          PetitionHistory[]
+  type              String?           @default("Complaint")
+  sirOfficerName    String?
+  officerRank       String?
+  proposalStatus    String?
+  proposalSentDate  DateTime?
+  peNo              String?
+  peRegDate         DateTime?
+  peReportSentDate  DateTime?
+  peStatus          String?
+  sirEo             String?
+  sirEoDesignation  String?
+  status            String            @default("DRAFT")
+  createdById       String?
+  updatedById       String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  createdBy         User?             @relation("PetitionCreatedBy", fields: [createdById], references: [id])
+  updatedBy         User?             @relation("PetitionUpdatedBy", fields: [updatedById], references: [id])
+  remarks           Remark[]
+  respondents       Respondent[]
+  history           PetitionHistory[]
+
+  @@index([district])
+  @@index([status])
+  @@index([peStatus])
+  @@index([proposalStatus])
+  @@index([type])
+  @@index([createdAt])
+  @@index([peRegDate])
+  @@index([proposalSentDate])
+  @@index([createdById])
 }
 
 model Remark {
@@ -155,6 +173,8 @@ model Remark {
   petitionId String
   createdAt  DateTime @default(now())
   petition   Petition @relation(fields: [petitionId], references: [id], onDelete: Cascade)
+
+  @@index([petitionId])
 }
 
 model Respondent {
@@ -176,6 +196,10 @@ model Respondent {
   createdAt                DateTime  @default(now())
   updatedAt                DateTime  @updatedAt
   petition                 Petition  @relation(fields: [petitionId], references: [id], onDelete: Cascade)
+
+  @@index([petitionId])
+  @@index([permissionStatus])
+  @@index([department])
 }
 
 model PetitionHistory {
@@ -191,4 +215,35 @@ model PetitionHistory {
 
   petition            Petition @relation(fields: [petitionId], references: [id], onDelete: Cascade)
   actionBy            User?    @relation("HistoryActionBy", fields: [actionById], references: [id], onDelete: SetNull)
+
+  @@index([petitionId])
+  @@index([actionById])
+}
+
+model EditRequest {
+  id              String    @id @default(uuid())
+  type            String
+  recordId        String
+  recordTitle     String?
+  districtId      String?
+  districtName    String?
+  requestedById   String
+  requestedByName String?
+  reason          String
+  status          String    @default("PENDING")
+  expiresAt       DateTime?
+  adminRemarks    String?
+  reviewedById    String?
+  reviewedByName  String?
+  reviewedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  requestedBy     User      @relation("EditRequest_requestedByIdToUser", fields: [requestedById], references: [id], onDelete: Cascade)
+  reviewedBy      User?     @relation("EditRequest_reviewedByIdToUser", fields: [reviewedById], references: [id])
+
+  @@index([districtName])
+  @@index([requestedById])
+  @@index([status])
+  @@index([type, recordId])
 }

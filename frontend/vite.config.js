@@ -30,6 +30,7 @@ export default defineConfig({
           'vendor-forms': ['react-hook-form', '@hookform/resolvers', 'zod'],
           'vendor-lucide': ['lucide-react'],
           'vendor-excel': ['exceljs', 'file-saver'],
+          'vendor-pdf': ['jspdf', 'jspdf-autotable'],
         }
       }
     }
