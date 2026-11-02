@@ -1,11 +1,5 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
-let redisClient;
-try {
-  redisClient = require('./redisClient');
-} catch (e) {
-  // redis optional
-}
 
 const RAW_DATA = [
   // Bengaluru City (linked to both Bengaluru City 1 and Bengaluru City 2)

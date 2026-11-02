@@ -540,5 +540,14 @@ main()
     process.exit(1);
   })
   .finally(async () => {
-    await prisma.$disconnect();
+    try {
+      await prisma.$disconnect();
+    } catch (e) {}
+    try {
+      const redisClient = require('../redisClient');
+      if (redisClient && redisClient.isOpen) {
+        await redisClient.quit();
+      }
+    } catch (e) {}
+    process.exit(0);
   });
