@@ -3,6 +3,7 @@ const router = express.Router();
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const prisma = require('../prismaClient');
+const { modulesForRole } = require('../modulePermissions');
 
 // Login endpoint
 router.post('/login', async (req, res) => {
@@ -50,7 +51,8 @@ router.post('/login', async (req, res) => {
       userId: user.id,
       districtId: effectiveDistrictId,
       isHeadOffice,
-      districtName: effectiveDistrictName
+      districtName: effectiveDistrictName,
+      modules: modulesForRole(user.role, user.modules)
     });
   } catch (error) {
     console.error('Login error:', error);
@@ -82,6 +84,31 @@ const adminMiddleware = (req, res, next) => {
   }
   next();
 };
+
+// Current account state for the signed-in user — the UI refreshes module access from here so an
+// admin's permission change shows up without signing out. 401 makes the client end a session
+// whose account was deactivated or removed.
+router.get('/me', authMiddleware, async (req, res) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.userId },
+      select: { id: true, email: true, fullName: true, role: true, isActive: true, modules: true }
+    });
+    if (!user || !user.isActive) {
+      return res.status(401).json({ error: 'Your account is no longer active. Please sign in again.' });
+    }
+    res.json({
+      userId: user.id,
+      email: user.email,
+      fullName: user.fullName,
+      role: user.role,
+      modules: modulesForRole(user.role, user.modules)
+    });
+  } catch (error) {
+    console.error('Fetch current user error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 // Self-service password change — any authenticated user may change their own password
 router.post('/change-password', authMiddleware, async (req, res) => {

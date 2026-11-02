@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, Lock, User, Eye, EyeOff, Scale, Sparkles, ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Lock, User, Eye, EyeOff, ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { BASE_URL } from '../lib/api';
 
 export default function Login({ onLogin }) {
@@ -48,6 +48,7 @@ export default function Login({ onLogin }) {
         if (data.districtId) localStorage.setItem('districtId', data.districtId);
         if (data.districtName) localStorage.setItem('districtName', data.districtName);
         localStorage.setItem('isHeadOffice', data.isHeadOffice ? '1' : '0');
+        localStorage.setItem('modules', JSON.stringify(data.modules || []));
         onLogin();
       } else {
         throw new Error(data.error || 'Invalid credentials. Please verify your Email/Login ID and password.');
@@ -89,36 +90,23 @@ export default function Login({ onLogin }) {
         className={`relative w-full max-w-[460px] rounded-3xl backdrop-blur-2xl bg-gradient-to-b from-[#03114F]/92 via-[#010B3B]/95 to-[#000624]/98 border border-[#2B4DAE]/60 px-7 sm:px-10 pt-9 pb-8 text-center transition-all duration-300 shadow-[0_25px_80px_rgba(0,4,30,0.85),0_0_50px_rgba(0,14,137,0.35),inset_0_1px_1.5px_rgba(122,167,255,0.25)] animate-cover-in ${shake ? 'animate-shake' : ''}`}
       >
         {/* Top Grand Seal / Emblem */}
-        <div className="relative mx-auto mb-5 w-24 h-24 flex items-center justify-center">
-          {/* Outer glowing animated pulse ring */}
-          <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-[#0022D6]/40 via-[#C9A15E]/30 to-[#00126E]/50 animate-pulse blur-sm" />
-          
-          {/* Double Gold & Royal Dark Blue Ring Seal */}
-          <div className="relative w-20 h-20 rounded-full p-[2px] bg-gradient-to-b from-[#FFF2D6] via-[#C9A15E] to-[#0015A8] shadow-[0_8px_25px_rgba(0,0,0,0.6),0_0_22px_rgba(0,25,180,0.5)]">
-            <div className="w-full h-full rounded-full flex flex-col items-center justify-center bg-gradient-to-b from-[#001F99] via-[#000E89] to-[#00052E] border border-[#C9A15E]/60 text-center">
-              <div className="flex items-center gap-1 text-[#EBD5A5]">
-                <Scale className="w-4 h-4 text-[#FDE047]" />
-                <Shield className="w-6 h-6 text-[#C9A15E]" />
-              </div>
-              <span className="text-[7.5px] font-bold text-[#EBD5A5] uppercase tracking-wider mt-0.5 font-mono">
-                LOKAYUKTA
-              </span>
+        <div className="relative mx-auto mb-5 flex items-center justify-center">
+          {/* Double Gold & Royal Dark Blue Ring Medallion */}
+          <div className="relative w-24 h-24 rounded-full p-[2.5px] bg-gradient-to-b from-[#FFF2D6] via-[#C9A15E] to-[#0015A8] shadow-[0_12px_28px_rgba(0,0,0,0.55)] flex items-center justify-center">
+            <div className="w-full h-full rounded-full bg-gradient-to-b from-[#FFFFFF] via-[#FFFDF5] to-[#F5EED9] p-2 flex items-center justify-center border border-[#C9A15E]/70 shadow-inner overflow-hidden">
+              <img 
+                src="/lokayukta-emblem.png" 
+                alt="ಕರ್ನಾಟಕ ಲೋಕಾಯುಕ್ತ ಮುದ್ರೆ · Karnataka Lokayukta Emblem" 
+                className="w-full h-full object-contain filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.18)] select-none pointer-events-none"
+              />
             </div>
           </div>
         </div>
 
-        {/* Bilingual Titles & Authority Subtitles */}
+        {/* Portal Title */}
         <div className="mb-6">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#001DB5]/30 border border-[#3B66DE]/50 text-[#C9E0FF] text-[11px] font-semibold tracking-wider uppercase mb-2 shadow-inner">
-            <Sparkles className="w-3 h-3 text-[#FDE047]" />
-            <span>ಕರ್ನಾಟಕ ಸರ್ಕಾರ · Govt. of Karnataka</span>
-          </div>
-
-          <h2 className="text-[17px] font-serif font-bold text-[#F5EFE1] tracking-wide leading-tight text-center">
+          <h1 className="text-[23px] sm:text-[25px] font-serif font-bold text-[#F5EFE1] tracking-wide leading-tight text-center">
             ಕರ್ನಾಟಕ ಲೋಕಾಯುಕ್ತ
-          </h2>
-          <h1 className="text-[21px] font-serif font-bold tracking-tight mt-1 bg-gradient-to-r from-[#FFFFFF] via-[#D8E6FF] to-[#99BFFF] bg-clip-text text-transparent">
-            17-A Proposals & Status Register
           </h1>
         </div>
 

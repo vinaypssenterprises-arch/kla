@@ -94,7 +94,7 @@ export default function AnalyticsCharts({
               <div className="flex items-center gap-2">
                 <MapPin className="w-4 h-4 text-brass" />
                 <h4 className="text-[15px] font-serif font-bold text-ink-text">
-                  District Vigilance Activity & Enforcement Coverage
+                  Petitions Registered by District
                 </h4>
               </div>
               <span className="text-[11px] text-ink-text-soft bg-parchment-2 px-2.5 py-0.5 rounded border border-rule/40">
@@ -117,22 +117,11 @@ export default function AnalyticsCharts({
                     width={130}
                     tick={{ fontSize: 11.5, fill: '#241E14', fontWeight: 600 }} 
                   />
-                  <Tooltip content={<CustomBarTooltip />} />
-                  <Legend 
-                    wrapperStyle={{ fontSize: 11, paddingTop: 8 }} 
-                    iconType="circle"
-                  />
+                  <Tooltip content={<CustomBarTooltip />} cursor={{ fill: 'rgba(59,130,246,0.06)' }} />
                   <Bar 
                     dataKey="petitions" 
                     name="Petitions Registered" 
                     fill="#3B82F6" 
-                    radius={[0, 4, 4, 0]} 
-                    barSize={16} 
-                  />
-                  <Bar 
-                    dataKey="officers" 
-                    name="Officers Deployed" 
-                    fill="#C9A15E" 
                     radius={[0, 4, 4, 0]} 
                     barSize={16} 
                   />

@@ -31,9 +31,9 @@ export default {
         'neutral-bg': 'var(--neutral-bg)',
       },
       fontFamily: {
-        sans: ['"Public Sans"', 'system-ui', 'sans-serif'],
-        serif: ['Fraunces', 'Georgia', 'serif'],
-        mono: ['"IBM Plex Mono"', 'monospace'],
+        sans: ['"Plus Jakarta Sans"', '"Noto Sans Kannada"', 'system-ui', '-apple-system', 'sans-serif'],
+        serif: ['Lora', '"Noto Serif Kannada"', 'Georgia', 'serif'],
+        mono: ['"JetBrains Mono"', '"IBM Plex Mono"', 'ui-monospace', 'monospace'],
       },
       boxShadow: {
         soft: 'var(--shadow-soft)',

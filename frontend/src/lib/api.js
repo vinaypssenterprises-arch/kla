@@ -49,5 +49,24 @@ export async function apiFetch(endpoint, options = {}) {
     throw new Error('Session expired. Please sign in again.');
   }
 
+  // Module permission changed by an admin mid-session
+  if (res.status === 403) {
+    const body = await res.clone().json().catch(() => null);
+    if (body?.code === 'ACCOUNT_INACTIVE') {
+      localStorage.clear();
+      window.location.href = '/login';
+      throw new Error(body.error);
+    }
+    if (body?.code === 'MODULE_FORBIDDEN' && body.module) {
+      try {
+        const allowed = JSON.parse(localStorage.getItem('modules') || '[]');
+        localStorage.setItem('modules', JSON.stringify(allowed.filter(m => m !== body.module)));
+      } catch {
+        // ignore malformed storage
+      }
+      if (window.location.pathname !== '/home') window.location.href = '/home';
+    }
+  }
+
   return res;
 }

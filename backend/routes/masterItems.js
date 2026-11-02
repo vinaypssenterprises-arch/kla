@@ -4,7 +4,21 @@ const prisma = require('../prismaClient');
 const redisClient = require('../redisClient');
 const { authMiddleware, adminMiddleware } = require('./auth');
 
-const CATEGORIES = ['taluk', 'policeStation', 'department', 'subDepartment', 'peStatus', 'proposalStatus'];
+const CATEGORIES = [
+  'taluk',
+  'policeStation',
+  'department',
+  'subDepartment',
+  'peStatus',
+  'proposalStatus',
+  'spp',
+  'stayType',
+  'workingDesignation',
+  'workingDistrict',
+  'act',
+  'actSection',
+  'courtName'
+];
 
 router.use(authMiddleware);
 
@@ -43,8 +57,12 @@ router.post('/:category', checkCategory, adminMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'Name is required' });
     }
 
-    const existing = await prisma.masterItem.findUnique({
-      where: { category_name: { category: req.params.category, name: name.trim() } }
+    const existing = await prisma.masterItem.findFirst({
+      where: {
+        category: req.params.category,
+        name: { equals: name.trim(), mode: 'insensitive' },
+        ...(parentId !== undefined ? { parentId: parentId || null } : {})
+      }
     });
     if (existing) return res.status(409).json({ error: 'This entry already exists' });
 

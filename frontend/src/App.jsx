@@ -14,6 +14,14 @@ const OfficerDetail = lazy(() => import('./pages/OfficerDetail'));
 const UserManagement = lazy(() => import('./components/UserManagement'));
 const Masters = lazy(() => import('./components/Masters'));
 const Reports = lazy(() => import('./pages/Reports'));
+const ModuleHub = lazy(() => import('./pages/ModuleHub'));
+const OfficersDashboard = lazy(() => import('./pages/OfficersDashboard'));
+const OfficerReports = lazy(() => import('./pages/OfficerReports'));
+const CourtCasesDashboard = lazy(() => import('./pages/CourtCasesDashboard'));
+const CourtCasesList = lazy(() => import('./pages/CourtCasesList'));
+const CourtCaseForm = lazy(() => import('./pages/CourtCaseForm'));
+const CourtCaseDetail = lazy(() => import('./pages/CourtCaseDetail'));
+const CourtCaseReports = lazy(() => import('./pages/CourtCaseReports'));
 
 // Skeleton screen for route-level suspense boundary
 function PageSkeleton() {
@@ -38,22 +46,29 @@ function RequireAuth({ children }) {
 
 function RequireAdmin({ children }) {
   const role = localStorage.getItem('role');
-  return role === 'admin' ? children : <Navigate to="/dashboard" replace />;
+  return role === 'admin' ? children : <Navigate to="/home" replace />;
 }
 
 function AppRoutes() {
   const navigate = useNavigate();
 
-  const handleLogin = () => navigate('/dashboard');
+  const handleLogin = () => navigate('/home');
 
   const handleLogout = () => {
-    ['token', 'email', 'role', 'fullName', 'userId', 'districtId', 'districtName', 'isHeadOffice'].forEach(key => localStorage.removeItem(key));
+    ['token', 'email', 'role', 'fullName', 'userId', 'districtId', 'districtName', 'isHeadOffice', 'activeModule', 'modules'].forEach(key => localStorage.removeItem(key));
     navigate('/login');
   };
 
   return (
     <Routes>
       <Route path="/login" element={<Login onLogin={handleLogin} />} />
+
+      {/* Post-login module hub: pick Petitions or Officers */}
+      <Route path="/home" element={
+        <RequireAuth>
+          <Suspense fallback={<div className="min-h-screen bg-[#FFFDF7]" />}><ModuleHub onLogout={handleLogout} /></Suspense>
+        </RequireAuth>
+      } />
 
       <Route element={<RequireAuth><Layout onLogout={handleLogout} /></RequireAuth>}>
         <Route path="/dashboard" element={
@@ -70,6 +85,12 @@ function AppRoutes() {
           <Suspense fallback={<PageSkeleton />}><FormPage /></Suspense>
         } />
 
+        <Route path="/officers/dashboard" element={
+          <Suspense fallback={<PageSkeleton />}><OfficersDashboard /></Suspense>
+        } />
+        <Route path="/officers/reports" element={
+          <Suspense fallback={<PageSkeleton />}><OfficerReports /></Suspense>
+        } />
         <Route path="/officers" element={
           <Suspense fallback={<PageSkeleton />}><OfficersList /></Suspense>
         } />
@@ -81,6 +102,25 @@ function AppRoutes() {
         } />
         <Route path="/officers/:id/edit" element={
           <Suspense fallback={<PageSkeleton />}><OfficerForm /></Suspense>
+        } />
+
+        <Route path="/court-cases/dashboard" element={
+          <Suspense fallback={<PageSkeleton />}><CourtCasesDashboard /></Suspense>
+        } />
+        <Route path="/court-cases/reports" element={
+          <Suspense fallback={<PageSkeleton />}><CourtCaseReports /></Suspense>
+        } />
+        <Route path="/court-cases" element={
+          <Suspense fallback={<PageSkeleton />}><CourtCasesList /></Suspense>
+        } />
+        <Route path="/court-cases/new" element={
+          <Suspense fallback={<PageSkeleton />}><CourtCaseForm /></Suspense>
+        } />
+        <Route path="/court-cases/:id" element={
+          <Suspense fallback={<PageSkeleton />}><CourtCaseDetail /></Suspense>
+        } />
+        <Route path="/court-cases/:id/edit" element={
+          <Suspense fallback={<PageSkeleton />}><CourtCaseForm /></Suspense>
         } />
 
         <Route path="/users" element={
@@ -100,10 +140,10 @@ function AppRoutes() {
           <Suspense fallback={<PageSkeleton />}><Reports /></Suspense>
         } />
 
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/" element={<Navigate to="/home" replace />} />
       </Route>
 
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      <Route path="*" element={<Navigate to="/home" replace />} />
     </Routes>
   );
 }

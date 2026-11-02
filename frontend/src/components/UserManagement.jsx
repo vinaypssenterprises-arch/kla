@@ -4,12 +4,53 @@ import {
   Users as UsersIcon, Plus, Pencil, Trash2, X, Search,
   Shield, UserCheck, UserX, MapPin, Building2,
   Award, Eye, EyeOff, Lock, AlertCircle, Check,
-  Filter, Key, Sparkles, ChevronDown
+  Filter, Key, Sparkles, ChevronDown, LayoutGrid, Minus
 } from 'lucide-react';
 import Modal from './ui/Modal';
 import ConfirmDialog from './ui/ConfirmDialog';
 import SearchableSelect from './ui/SearchableSelect';
 import { useToast } from './ui/ToastProvider';
+import { MODULES, MODULE_ORDER } from '../lib/modules';
+
+// Matches DEFAULT_USER_MODULES on the server
+const DEFAULT_MODULES = ['petitions', 'officers'];
+
+const userModules = (user) => (user.role === 'admin' ? MODULE_ORDER : MODULE_ORDER.filter(k => (user.modules || []).includes(k)));
+
+function ModuleChips({ user }) {
+  if (user.role === 'admin') {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-[#E8EEF9] text-[#000E89] border border-[#CBD8EF]">
+        <LayoutGrid className="w-3 h-3" /> All modules
+      </span>
+    );
+  }
+  const mods = userModules(user);
+  if (mods.length === 0) {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-brick-bg text-brick border border-brick-soft">
+        <Lock className="w-3 h-3" /> No access
+      </span>
+    );
+  }
+  return (
+    <div className="flex flex-wrap gap-1">
+      {mods.map(key => {
+        const m = MODULES[key];
+        return (
+          <span
+            key={key}
+            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10.5px] font-bold border whitespace-nowrap"
+            style={{ color: m.color, background: m.tint, borderColor: m.border }}
+          >
+            <m.icon className="w-3 h-3" />
+            {m.label}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
 
 const withLegacyOption = (opts, legacyValue, legacyLabel) =>
   legacyValue && !opts.some(o => o.value === legacyValue)
@@ -28,7 +69,8 @@ const emptyForm = {
   districtId: '',
   isHeadOffice: false,
   role: 'user',
-  isActive: true
+  isActive: true,
+  modules: DEFAULT_MODULES
 };
 
 export default function UserManagement() {
@@ -42,6 +84,9 @@ export default function UserManagement() {
   const [roleFilter, setRoleFilter] = useState('ALL'); // ALL, admin, user, viewer
   const [statusFilter, setStatusFilter] = useState('ALL'); // ALL, ACTIVE, INACTIVE
   const [jurisdictionFilter, setJurisdictionFilter] = useState('ALL'); // ALL, HEAD_OFFICE, DISTRICTS
+  const [moduleFilter, setModuleFilter] = useState('ALL'); // ALL, NONE, or a module key
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
@@ -127,7 +172,8 @@ export default function UserManagement() {
       districtId: user.districtId || '',
       isHeadOffice: user.isHeadOffice || false,
       role: user.role,
-      isActive: user.isActive !== false
+      isActive: user.isActive !== false,
+      modules: user.modules || []
     });
     setShowPassword(false);
     setShowConfirmPassword(false);
@@ -159,6 +205,10 @@ export default function UserManagement() {
     if (!form.designationId) return setError('Designation is required.');
     if (!form.supervisorDesignationId) return setError('Supervisor Designation is required.');
     if (!form.isHeadOffice && !form.districtId) return setError('District is required.');
+
+    if (form.role !== 'admin' && form.modules.length === 0) {
+      return setError('Select at least one module. To block all access, set the account to Inactive.');
+    }
 
     if (!editingUser && !form.password) {
       return setError('Password is required.');
@@ -224,6 +274,49 @@ export default function UserManagement() {
     }
   };
 
+  const toggleFormModule = (key) => {
+    setForm(prev => ({
+      ...prev,
+      modules: prev.modules.includes(key) ? prev.modules.filter(m => m !== key) : MODULE_ORDER.filter(m => m === key || prev.modules.includes(m))
+    }));
+  };
+
+  const toggleSelected = (id) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const handleBulkModule = async (moduleKey, enabled) => {
+    if (selectedIds.size === 0) return;
+    setBulkBusy(true);
+    try {
+      const res = await apiFetch('/users/modules', {
+        method: 'PATCH',
+        body: JSON.stringify({ userIds: [...selectedIds], module: moduleKey, enabled })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Failed to update module access.');
+
+      const label = MODULES[moduleKey].label;
+      showSuccess?.(
+        data.updated === 0
+          ? `No change — the selected users already ${enabled ? 'have' : 'lack'} ${label}.`
+          : `${label} ${enabled ? 'granted to' : 'revoked from'} ${data.updated} user${data.updated === 1 ? '' : 's'}.`
+      );
+      if (data.withoutModules > 0) {
+        showError(`${data.withoutModules} user${data.withoutModules === 1 ? ' now has' : 's now have'} no module access and will see an empty home page.`);
+      }
+      fetchInitialData();
+    } catch (err) {
+      showError(err.message);
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
   // Filtered Users logic
   const filteredUsers = useMemo(() => {
     return users.filter(user => {
@@ -238,6 +331,10 @@ export default function UserManagement() {
       if (jurisdictionFilter === 'HEAD_OFFICE' && !user.isHeadOffice) return false;
       if (jurisdictionFilter === 'DISTRICTS' && user.isHeadOffice) return false;
 
+      // Module filter
+      if (moduleFilter === 'NONE' && userModules(user).length > 0) return false;
+      if (moduleFilter !== 'ALL' && moduleFilter !== 'NONE' && !userModules(user).includes(moduleFilter)) return false;
+
       // Search query filter
       if (!searchQuery.trim()) return true;
       const q = searchQuery.toLowerCase().trim();
@@ -251,7 +348,31 @@ export default function UserManagement() {
 
       return nameMatch || emailMatch || kgidMatch || desigMatch || distMatch || roleMatch;
     });
-  }, [users, searchQuery, roleFilter, statusFilter, jurisdictionFilter]);
+  }, [users, searchQuery, roleFilter, statusFilter, jurisdictionFilter, moduleFilter]);
+
+  const moduleCounts = useMemo(() => {
+    const counts = Object.fromEntries(MODULE_ORDER.map(k => [k, 0]));
+    let none = 0;
+    users.forEach(u => {
+      const mods = userModules(u);
+      if (mods.length === 0) none++;
+      mods.forEach(k => { counts[k]++; });
+    });
+    return { ...counts, NONE: none };
+  }, [users]);
+
+  // Admins always hold every module, so only non-admin rows are selectable for bulk changes
+  const selectableFiltered = useMemo(() => filteredUsers.filter(u => u.role !== 'admin'), [filteredUsers]);
+  const allFilteredSelected = selectableFiltered.length > 0 && selectableFiltered.every(u => selectedIds.has(u.id));
+  const someFilteredSelected = selectableFiltered.some(u => selectedIds.has(u.id));
+  const toggleSelectAllFiltered = () => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (allFilteredSelected) selectableFiltered.forEach(u => next.delete(u.id));
+      else selectableFiltered.forEach(u => next.add(u.id));
+      return next;
+    });
+  };
 
   // Metric counts
   const totalCount = users.length;
@@ -550,7 +671,79 @@ export default function UserManagement() {
               </div>
             </div>
           </div>
+
+          {/* Module access filter */}
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-ink-text-faint flex items-center gap-1.5 mr-1">
+              <LayoutGrid className="w-3.5 h-3.5" /> Module Access
+            </span>
+            {[{ key: 'ALL', label: 'All Users', count: users.length }, ...MODULE_ORDER.map(k => ({ key: k, label: MODULES[k].label, count: moduleCounts[k], module: MODULES[k] })), { key: 'NONE', label: 'No Access', count: moduleCounts.NONE }].map(f => {
+              const active = moduleFilter === f.key;
+              return (
+                <button
+                  key={f.key}
+                  type="button"
+                  onClick={() => setModuleFilter(f.key)}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[12px] font-semibold border transition-all ${
+                    active ? 'shadow-xs' : 'bg-white border-rule/70 text-ink-text-soft hover:text-ink-text'
+                  }`}
+                  style={active ? (f.module
+                    ? { color: f.module.color, background: f.module.tint, borderColor: f.module.color }
+                    : { color: '#241E14', background: '#F2EDE2', borderColor: '#A0906B' }) : undefined}
+                >
+                  {f.module && <f.module.icon className="w-3.5 h-3.5" style={{ color: f.module.color }} />}
+                  {f.key === 'NONE' && <Lock className="w-3.5 h-3.5 text-brick" />}
+                  {f.label}
+                  <span className="font-mono text-[10.5px] opacity-80">({f.count})</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
+
+        {/* Bulk module access */}
+        {selectedIds.size > 0 && (
+          <div className="px-6 py-3 bg-[#EEF1FB] border-b border-[#C9D3F2] flex flex-wrap items-center gap-2.5">
+            <span className="text-[12.5px] font-bold text-[#000E89]">
+              {selectedIds.size} user{selectedIds.size === 1 ? '' : 's'} selected
+            </span>
+            <span className="text-[11.5px] text-ink-text-soft mr-1">Grant or revoke module access:</span>
+            {MODULE_ORDER.map(key => {
+              const m = MODULES[key];
+              return (
+                <div key={key} className="inline-flex items-stretch rounded-lg border bg-white overflow-hidden shadow-2xs" style={{ borderColor: m.border }}>
+                  <span className="px-2.5 py-1 text-[12px] font-semibold flex items-center gap-1.5" style={{ color: m.color }}>
+                    <m.icon className="w-3.5 h-3.5" />
+                    {m.label}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={bulkBusy}
+                    onClick={() => handleBulkModule(key, true)}
+                    title={`Grant ${m.label} to the selected users`}
+                    className="px-2 py-1 border-l text-[11.5px] font-bold text-forest hover:bg-forest-bg disabled:opacity-50 inline-flex items-center gap-0.5"
+                    style={{ borderColor: m.border }}
+                  >
+                    <Plus className="w-3 h-3" strokeWidth={3} /> Grant
+                  </button>
+                  <button
+                    type="button"
+                    disabled={bulkBusy}
+                    onClick={() => handleBulkModule(key, false)}
+                    title={`Revoke ${m.label} from the selected users`}
+                    className="px-2 py-1 border-l text-[11.5px] font-bold text-brick hover:bg-brick-bg disabled:opacity-50 inline-flex items-center gap-0.5"
+                    style={{ borderColor: m.border }}
+                  >
+                    <Minus className="w-3 h-3" strokeWidth={3} /> Revoke
+                  </button>
+                </div>
+              );
+            })}
+            <button type="button" onClick={() => setSelectedIds(new Set())} className="ml-auto text-[12px] font-semibold text-ink-text-soft hover:text-ink-text hover:underline">
+              Clear selection
+            </button>
+          </div>
+        )}
 
         {/* Content Table */}
         {loading ? (
@@ -603,6 +796,18 @@ export default function UserManagement() {
             <table className="w-full border-collapse">
               <thead>
                 <tr className="bg-[#F8F5EE] border-b border-[#E3DAC4]">
+                  <th className="py-3 pl-4 pr-1 w-8">
+                    <input
+                      type="checkbox"
+                      aria-label="Select all listed users"
+                      title="Select all listed users (admins excluded)"
+                      className="w-4 h-4 accent-[#000E89] cursor-pointer align-middle"
+                      checked={allFilteredSelected}
+                      ref={el => { if (el) el.indeterminate = !allFilteredSelected && someFilteredSelected; }}
+                      onChange={toggleSelectAllFiltered}
+                      disabled={selectableFiltered.length === 0}
+                    />
+                  </th>
                   <th className="py-3 px-4 text-center text-[11px] font-bold uppercase tracking-wider text-ink-text-soft w-12">
                     #
                   </th>
@@ -614,6 +819,9 @@ export default function UserManagement() {
                   </th>
                   <th className="py-3 px-4 text-left text-[11px] font-bold uppercase tracking-wider text-ink-text-soft">
                     Jurisdiction / Unit
+                  </th>
+                  <th className="py-3 px-4 text-left text-[11px] font-bold uppercase tracking-wider text-ink-text-soft">
+                    Module Access
                   </th>
                   <th className="py-3 px-4 text-left text-[11px] font-bold uppercase tracking-wider text-ink-text-soft">
                     Supervisor Line
@@ -639,6 +847,19 @@ export default function UserManagement() {
                       key={user.id}
                       className="hover:bg-[#F9F6EE] transition-colors duration-150 group"
                     >
+                      {/* Bulk selection */}
+                      <td className="py-3 pl-4 pr-1">
+                        <input
+                          type="checkbox"
+                          aria-label={`Select ${user.fullName || user.email}`}
+                          title={user.role === 'admin' ? 'Admins always have every module' : 'Select for bulk module access'}
+                          className="w-4 h-4 accent-[#000E89] cursor-pointer align-middle disabled:cursor-not-allowed disabled:opacity-40"
+                          checked={selectedIds.has(user.id)}
+                          disabled={user.role === 'admin'}
+                          onChange={() => toggleSelected(user.id)}
+                        />
+                      </td>
+
                       {/* Index */}
                       <td className="py-3 px-4 text-[12px] font-mono text-ink-text-faint text-center">
                         {idx + 1}
@@ -702,6 +923,11 @@ export default function UserManagement() {
                             <span>{user.district?.name || '—'}</span>
                           </div>
                         )}
+                      </td>
+
+                      {/* Module Access */}
+                      <td className="py-3 px-4 max-w-[220px]">
+                        <ModuleChips user={user} />
                       </td>
 
                       {/* Supervisor Line */}
@@ -788,7 +1014,7 @@ export default function UserManagement() {
             <strong className="text-ink-text font-bold">{users.length}</strong> total users
           </div>
           <div className="text-ink-text-faint text-[11.5px]">
-            Password updates and deactivations apply on the next login session.
+            Module access and deactivations apply within a minute; password changes on the next sign-in.
           </div>
         </div>
       </div>
@@ -1094,6 +1320,86 @@ export default function UserManagement() {
                   <option value="0">Inactive (Revoke login access)</option>
                 </select>
               </div>
+            </div>
+
+            {/* Section 6: Module Access */}
+            <div className="rounded-xl border border-rule/80 bg-white/70 p-4">
+              <div className="flex items-start justify-between gap-3 mb-3 flex-wrap">
+                <div>
+                  <div className="text-[12.5px] font-bold text-ink-text flex items-center gap-1.5">
+                    <LayoutGrid className="w-4 h-4 text-[#000E89]" />
+                    Module Access
+                    <span className="text-brass font-semibold">· ಮಾಡ್ಯೂಲ್ ಪ್ರವೇಶ</span>
+                  </div>
+                  <p className="text-[11.5px] text-ink-text-soft mt-0.5">
+                    The user sees only the enabled modules on their home page and cannot open the others.
+                  </p>
+                </div>
+                {form.role !== 'admin' && (
+                  <div className="flex items-center gap-1 text-[11.5px] font-semibold">
+                    <button type="button" className="px-2 py-0.5 rounded text-[#000E89] hover:bg-[#EEF1FB]" onClick={() => setForm(prev => ({ ...prev, modules: [...MODULE_ORDER] }))}>
+                      Enable all
+                    </button>
+                    <span className="text-ink-text-faint">·</span>
+                    <button type="button" className="px-2 py-0.5 rounded text-ink-text-soft hover:bg-parchment-2" onClick={() => setForm(prev => ({ ...prev, modules: [] }))}>
+                      Clear
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                {MODULE_ORDER.map(key => {
+                  const m = MODULES[key];
+                  const isAdminRole = form.role === 'admin';
+                  const on = isAdminRole || form.modules.includes(key);
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      role="switch"
+                      aria-checked={on}
+                      disabled={isAdminRole}
+                      onClick={() => toggleFormModule(key)}
+                      className={`relative text-left rounded-xl border-2 p-3 transition-all duration-150 ${
+                        on ? 'shadow-xs' : 'bg-white border-rule/70 hover:border-[#B7A876]'
+                      } ${isAdminRole ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                      style={on ? { borderColor: m.color, background: m.tint } : undefined}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <span
+                          className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors"
+                          style={on ? { background: m.color, color: '#fff' } : { background: '#F2EDE2', color: '#A0906B' }}
+                        >
+                          <m.icon className="w-4 h-4" />
+                        </span>
+                        <span
+                          className="relative w-9 h-5 rounded-full transition-colors flex-shrink-0"
+                          style={{ background: on ? m.color : '#D9D2B4' }}
+                          aria-hidden="true"
+                        >
+                          <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${on ? 'left-[18px]' : 'left-0.5'}`} />
+                        </span>
+                      </div>
+                      <div className="mt-2 text-[13px] font-bold text-ink-text leading-tight">{m.label}</div>
+                      <div className="text-[11px] font-semibold leading-tight mt-0.5" style={{ color: on ? m.color : '#A0906B' }}>{m.kannada}</div>
+                      <div className="text-[10.5px] font-bold uppercase tracking-wider mt-1.5" style={{ color: on ? m.color : '#A0906B' }}>
+                        {on ? 'Enabled' : 'Disabled'}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {form.role === 'admin' ? (
+                <p className="mt-2.5 text-[11.5px] font-semibold text-[#000E89] flex items-center gap-1.5">
+                  <Shield className="w-3.5 h-3.5" /> Admins always have access to every module.
+                </p>
+              ) : form.modules.length === 0 ? (
+                <p className="mt-2.5 text-[11.5px] font-semibold text-brick flex items-center gap-1.5">
+                  <AlertCircle className="w-3.5 h-3.5" /> Enable at least one module for this user.
+                </p>
+              ) : null}
             </div>
 
             {/* Error Message */}

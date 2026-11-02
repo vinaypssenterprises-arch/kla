@@ -1,0 +1,213 @@
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
+
+const DATA = [
+  ["THE PREVENTION OF CORRUPTION ACT, 1988 (AMENDMENT 2018)", "7(a)"],
+  ["THE PREVENTION OF CORRUPTION ACT, 1988 (AMENDMENT 2018)", "13(1)(e)"],
+  ["THE PREVENTION OF CORRUPTION ACT, 1988 (AMENDMENT 2018)", "13(2)"],
+  ["THE PREVENTION OF CORRUPTION ACT, 1988 (AMENDMENT 2018)", "13(1) (c) (d) r/w 13(2)"],
+  ["THE PREVENTION OF CORRUPTION ACT, 1988 (AMENDMENT 2018)", "13(1) (a) r/w 13(2)"],
+  ["THE PREVENTION OF CORRUPTION ACT, 1988 (AMENDMENT 2018)", "8"],
+  ["THE PREVENTION OF CORRUPTION ACT, 1988 (AMENDMENT 2018)", "7,13(1)(d) r/w  13(2)"],
+  ["THE PREVENTION OF CORRUPTION ACT, 1988 (AMENDMENT 2018)", "12"],
+  ["THE PREVENTION OF CORRUPTION ACT, 1988 (AMENDMENT 2018)", "11"],
+  ["THE PREVENTION OF CORRUPTION ACT, 1988 (AMENDMENT 2018)", "13(1) (b) R/W 13 (2)"],
+  ["THE PREVENTION OF CORRUPTION ACT, 1988 (AMENDMENT 2018)", "7(c)"],
+  ["THE PREVENTION OF CORRUPTION ACT, 1988 (AMENDMENT 2018)", "7(b)"],
+  ["THE PREVENTION OF CORRUPTION ACT, 1988 (AMENDMENT 2018)", "7A"],
+  ["THE PREVENTION OF CORRUPTION ACT, 1988 (AMENDMENT 2018)", "9"],
+  ["THE PREVENTION OF CORRUPTION ACT, 1988 (AMENDMENT 2018)", "10"],
+  ["THE PREVENTION OF CORRUPTION ACT, 1988 (AMENDMENT 2018)", "7"],
+  ["THE PREVENTION OF CORRUPTION ACT, 1988 (AMENDMENT 2018)", "13(1)(2)"],
+  ["THE PREVENTION OF CORRUPTION ACT, 1988 (AMENDMENT 2018)", "13(1)(d)"],
+  ["THE PREVENTION OF CORRUPTION ACT, 1988 (AMENDMENT 2018)", "13(1)(C)"],
+  ["THE PREVENTION OF CORRUPTION ACT, 1988 (AMENDMENT 2018)", "13(1)(c)r/w13(2)"],
+  ["THE PREVENTION OF CORRUPTION ACT, 1988 (AMENDMENT 2018)", "13(1)(a)"],
+  ["THE PREVENTION OF CORRUPTION ACT, 1988 (AMENDMENT 2018)", "13(1)(b)"],
+  ["THE PREVENTION OF CORRUPTION ACT, 1988 (AMENDMENT 2018)", "8(1)"],
+  ["THE BHARATIYA NYAYA SANHITA (BNS), 2023", "3(5)"],
+  ["THE BHARATIYA NYAYA SANHITA (BNS), 2023", "61"],
+  ["THE BHARATIYA NYAYA SANHITA (BNS), 2023", "316(5)"],
+  ["THE BHARATIYA NYAYA SANHITA (BNS), 2023", "318(4)"],
+  ["THE BHARATIYA NYAYA SANHITA (BNS), 2023", "334"],
+  ["THE BHARATIYA NYAYA SANHITA (BNS), 2023", "336"],
+  ["THE BHARATIYA NYAYA SANHITA (BNS), 2023", "61(2)"],
+  ["THE BHARATIYA NYAYA SANHITA (BNS), 2023", "336(3)"],
+  ["THE BHARATIYA NYAYA SANHITA (BNS), 2023", "340(2)"],
+  ["THE BHARATIYA NYAYA SANHITA (BNS), 2023", "336(2)"],
+  ["THE BHARATIYA NYAYA SANHITA (BNS), 2023", "49"],
+  ["THE BHARATIYA NYAYA SANHITA (BNS), 2023", "198"],
+  ["THE BHARATIYA NYAYA SANHITA (BNS), 2023", "127(1)"],
+  ["THE BHARATIYA NYAYA SANHITA (BNS), 2023", "130"],
+  ["THE BHARATIYA NYAYA SANHITA (BNS), 2023", "314"],
+  ["THE BHARATIYA NYAYA SANHITA (BNS), 2023", "315"],
+  ["THE BHARATIYA NYAYA SANHITA (BNS), 2023", "316(1)"],
+  ["THE BHARATIYA NYAYA SANHITA (BNS), 2023", "316(2)"],
+  ["THE BHARATIYA NYAYA SANHITA (BNS), 2023", "316(3)"],
+  ["THE BHARATIYA NYAYA SANHITA (BNS), 2023", "316(4)"],
+  ["THE BHARATIYA NYAYA SANHITA (BNS), 2023", "318(1)"],
+  ["THE BHARATIYA NYAYA SANHITA (BNS), 2023", "319(1)"],
+  ["THE BHARATIYA NYAYA SANHITA (BNS), 2023", "318(2)"],
+  ["THE BHARATIYA NYAYA SANHITA (BNS), 2023", "318(3)"],
+  ["THE BHARATIYA NYAYA SANHITA (BNS), 2023", "319(2)"],
+  ["THE BHARATIYA NYAYA SANHITA (BNS), 2023", "320"],
+  ["THE BHARATIYA NYAYA SANHITA (BNS), 2023", "321"],
+  ["THE BHARATIYA NYAYA SANHITA (BNS), 2023", "322"],
+  ["THE BHARATIYA NYAYA SANHITA (BNS), 2023", "323"],
+  ["THE BHARATIYA NYAYA SANHITA (BNS), 2023", "324(2)"],
+  ["THE BHARATIYA NYAYA SANHITA (BNS), 2023", "336(1)"],
+  ["THE BHARATIYA NYAYA SANHITA (BNS), 2023", "335"],
+  ["THE BHARATIYA NYAYA SANHITA (BNS), 2023", "337"],
+  ["THE BHARATIYA NYAYA SANHITA (BNS), 2023", "338"],
+  ["THE BHARATIYA NYAYA SANHITA (BNS), 2023", "336(4)"],
+  ["THE BHARATIYA NYAYA SANHITA (BNS), 2023", "340(1)"],
+  ["THE BHARATIYA NYAYA SANHITA (BNS), 2023", "341(1)"],
+  ["THE BHARATIYA NYAYA SANHITA (BNS), 2023", "341(2)"],
+  ["THE BHARATIYA NYAYA SANHITA (BNS), 2023", "339"],
+  ["THE BHARATIYA NYAYA SANHITA (BNS), 2023", "343"],
+  ["THE BHARATIYA NYAYA SANHITA (BNS), 2023", "324(1)"],
+  ["THE INDIAN PENAL CODE, 1860", "120 (B)"],
+  ["THE INDIAN PENAL CODE, 1860", "420"],
+  ["THE INDIAN PENAL CODE, 1860", "409"],
+  ["THE INDIAN PENAL CODE, 1860", "468"],
+  ["THE INDIAN PENAL CODE, 1860", "406"],
+  ["THE INDIAN PENAL CODE, 1860", "471"],
+  ["THE INDIAN PENAL CODE, 1860", "465"],
+  ["THE INDIAN PENAL CODE, 1860", "466"],
+  ["THE INDIAN PENAL CODE, 1860", "467"],
+  ["THE INDIAN PENAL CODE, 1860", "419"],
+  ["THE INDIAN PENAL CODE, 1860", "470"],
+  ["THE INDIAN PENAL CODE, 1860", "384"],
+  ["THE INDIAN PENAL CODE, 1860", "34"],
+  ["THE INDIAN PENAL CODE, 1860", "447 r/w 34"],
+  ["THE INDIAN PENAL CODE, 1860", "166(A)"],
+  ["THE INDIAN PENAL CODE, 1860", "167"],
+  ["THE INDIAN PENAL CODE, 1860", "464"],
+  ["THE INDIAN PENAL CODE, 1860", "473"],
+  ["THE INDIAN PENAL CODE, 1860", "474"],
+  ["THE INDIAN PENAL CODE, 1860", "475"],
+  ["THE INDIAN PENAL CODE, 1860", "201"],
+  ["THE INDIAN PENAL CODE, 1860", "403"],
+  ["THE INDIAN PENAL CODE, 1860", "477A"],
+  ["THE INDIAN PENAL CODE, 1860", "417"],
+  ["THE INDIAN PENAL CODE, 1860", "109"],
+  ["THE INDIAN PENAL CODE, 1860", "166"],
+  ["THE INDIAN PENAL CODE, 1860", "340"],
+  ["THE INDIAN PENAL CODE, 1860", "351"],
+  ["THE INDIAN PENAL CODE, 1860", "404"],
+  ["THE INDIAN PENAL CODE, 1860", "405"],
+  ["THE INDIAN PENAL CODE, 1860", "407"],
+  ["THE INDIAN PENAL CODE, 1860", "408"],
+  ["THE INDIAN PENAL CODE, 1860", "415"],
+  ["THE INDIAN PENAL CODE, 1860", "416"],
+  ["THE INDIAN PENAL CODE, 1860", "418"],
+  ["THE INDIAN PENAL CODE, 1860", "421"],
+  ["THE INDIAN PENAL CODE, 1860", "422"],
+  ["THE INDIAN PENAL CODE, 1860", "423"],
+  ["THE INDIAN PENAL CODE, 1860", "424"],
+  ["THE INDIAN PENAL CODE, 1860", "426"],
+  ["THE INDIAN PENAL CODE, 1860", "463"],
+  ["THE INDIAN PENAL CODE, 1860", "469"],
+  ["THE INDIAN PENAL CODE, 1860", "472"],
+  ["THE INDIAN PENAL CODE, 1860", "477"],
+  ["THE INDIAN PENAL CODE, 1860", "147"],
+  ["THE INDIAN PENAL CODE, 1860", "425"],
+  ["THE INDIAN PENAL CODE, 1860", "149"],
+  ["THE INDIAN PENAL CODE, 1860", "204"],
+  ["THE INDIAN PENAL CODE, 1860", "207"],
+  ["The Karnataka Transparency in Public Procurements (KTPP) Act, 1999", "23"],
+  ["THE PREVENTION OF CORRUPTION ACT, 1988", "7"],
+  ["THE PREVENTION OF CORRUPTION ACT, 1988", "8"],
+  ["THE PREVENTION OF CORRUPTION ACT, 1988", "9"],
+  ["THE PREVENTION OF CORRUPTION ACT, 1988", "10"],
+  ["THE PREVENTION OF CORRUPTION ACT, 1988", "11"],
+  ["THE PREVENTION OF CORRUPTION ACT, 1988", "12"],
+  ["THE PREVENTION OF CORRUPTION ACT, 1988", "13(1)(a) r/w 13(2)"],
+  ["THE PREVENTION OF CORRUPTION ACT, 1988", "13(1)(b) r/w 13(2)"],
+  ["THE PREVENTION OF CORRUPTION ACT, 1988", "13(1)(c) r/w 13(2)"],
+  ["THE PREVENTION OF CORRUPTION ACT, 1988", "13(1)(d) r/w 13(2)"],
+  ["THE PREVENTION OF CORRUPTION ACT, 1988", "13(1)(e) r/w 13(2)"],
+  ["THE PREVENTION OF CORRUPTION ACT, 1988", "14"],
+  ["THE PREVENTION OF CORRUPTION ACT, 1988", "15"],
+  ["THE PREVENTION OF CORRUPTION ACT, 1988", "13 1 c d i ii iii"],
+  ["THE PREVENTION OF CORRUPTION ACT, 1988", "13"],
+  ["THE KARNATAKA LAND GRABBING PROHIBITION ACT, 2011", "3"],
+  ["THE KARNATAKA LAND GRABBING PROHIBITION ACT, 2011", "4"],
+  ["THE PROHIBITION OF BENAMI PROPERTY TRANSACTIONS ACT, 1988", "3"],
+  ["THE PROHIBITION OF BENAMI PROPERTY TRANSACTIONS ACT, 1988", "53"],
+  ["THE PROHIBITION OF BENAMI PROPERTY TRANSACTIONS ACT, 1988", "54"],
+  ["THE KARNATAKA LAND (RESTRICTION ON TRANSFER) ACT, 1991", "3"],
+  ["THE KARNATAKA LAND (RESTRICTION ON TRANSFER) ACT, 1991", "4"],
+  ["THE KARNATAKA LAND (RESTRICTION ON TRANSFER) ACT, 1991", "8"],
+  ["THE KARNATAKA LAND (RESTRICTION ON TRANSFER) ACT, 1991", "9"]
+];
+
+async function seed() {
+  console.log('Clearing existing act and actSection master items...');
+  const delSec = await prisma.masterItem.deleteMany({ where: { category: 'actSection' } });
+  const delAct = await prisma.masterItem.deleteMany({ where: { category: 'act' } });
+  console.log(`Deleted ${delSec.count} sections and ${delAct.count} acts.`);
+
+async function seedActsAndSections(prismaClient = prisma, force = false) {
+  const existing = await prismaClient.masterItem.count({ where: { category: 'act' } });
+  if (existing > 0 && !force) {
+    console.log(`Acts & sections already seeded (${existing} acts found), skipping.`);
+    return;
+  }
+  if (force) {
+    await prismaClient.masterItem.deleteMany({ where: { category: { in: ['act', 'actSection'] } } });
+  }
+
+  // Extract distinct acts preserving original order
+  const distinctActs = [];
+  for (const [actName] of DATA) {
+    if (!distinctActs.includes(actName)) {
+      distinctActs.push(actName);
+    }
+  }
+
+  console.log(`Found ${distinctActs.length} distinct acts to insert:`);
+  distinctActs.forEach((a, i) => console.log(`  ${i + 1}. ${a}`));
+
+  const actMap = new Map();
+  for (const actName of distinctActs) {
+    const createdAct = await prismaClient.masterItem.create({
+      data: {
+        category: 'act',
+        name: actName,
+        isActive: true
+      }
+    });
+    actMap.set(actName, createdAct.id);
+  }
+
+  console.log(`Inserted ${actMap.size} acts. Now inserting sections...`);
+  let sectionCount = 0;
+  for (const [actName, sectionName] of DATA) {
+    const parentId = actMap.get(actName);
+    if (!parentId) continue;
+    await prismaClient.masterItem.create({
+      data: {
+        category: 'actSection',
+        name: sectionName.trim(),
+        parentId,
+        isActive: true
+      }
+    });
+    sectionCount++;
+  }
+
+  console.log(`✅ Successfully seeded ${actMap.size} Acts and ${sectionCount} Sections!`);
+}
+
+module.exports = { seedActsAndSections };
+
+if (require.main === module) {
+  seedActsAndSections(prisma, true)
+    .catch(err => {
+      console.error('Seeding error:', err);
+      process.exit(1);
+    })
+    .finally(() => prisma.$disconnect());
+}
+

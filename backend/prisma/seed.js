@@ -60,7 +60,15 @@ async function seedDistricts() {
 // the standard Karnataka government department directory below.
 const MASTER_ITEMS = {
   peStatus: ["PE Pending", "Register FIR", "Recommended to DE", "Close"],
-  proposalStatus: ["Returned with remarks", "Accept"]
+  proposalStatus: ["Returned with remarks", "Accept"],
+  // Special Public Prosecutors handling Lokayukta matters before the High Court
+  spp: [
+    "BB Patil", "Venkatesh Arabatti", "B S Patil", "B V Patil", "Anil Kale", "Ashwini S Haladi",
+    "Gurudev Gachinamath", "Joseph Anthony", "K S Mallikarjuna Reddy", "Nagaraj J S", "Vikram Hegde",
+    "Prasanna Shetty", "Subhash Pallapur"
+  ],
+  // Starter list for the Court Case "Stay Type" dropdown — admins can edit it in Masters
+  stayType: ["Interim Stay", "Stay of Investigation", "Stay of Further Proceedings", "No Coercive Steps"]
 };
 
 async function seedMasterItems() {
@@ -75,7 +83,7 @@ async function seedMasterItems() {
       count++;
     }
   }
-  console.log(`Seeded ${count} master items (peStatus, proposalStatus)`);
+  console.log(`Seeded ${count} master items (${Object.keys(MASTER_ITEMS).join(', ')})`);
 }
 
 // Standard Karnataka government departments and their sub-departments/offices,
@@ -501,6 +509,20 @@ async function main() {
   await seedDistricts();
   await seedMasterItems();
   await seedDepartments();
+
+  try {
+    const { seedActsAndSections } = require('../seed_acts_sections');
+    await seedActsAndSections(prisma);
+  } catch (e) {
+    console.error('Acts & sections seed skipped/error:', e.message);
+  }
+
+  try {
+    const { seedCourtsAndSpps } = require('../seed_courts_spps');
+    await seedCourtsAndSpps(prisma);
+  } catch (e) {
+    console.error('Courts & SPPs seed skipped/error:', e.message);
+  }
 }
 
 main()

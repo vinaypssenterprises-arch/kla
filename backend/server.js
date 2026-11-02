@@ -13,6 +13,7 @@ const officersRouter = require('./routes/officers');
 const masterItemsRouter = require('./routes/masterItems');
 const dashboardRouter = require('./routes/dashboard');
 const designationsRouter = require('./routes/designations');
+const courtCasesRouter = require('./routes/courtCases');
 
 const app = express();
 app.set('trust proxy', 1);
@@ -78,6 +79,7 @@ app.use('/api/officers', officersRouter);
 app.use('/api/master-items', masterItemsRouter);
 app.use('/api/dashboard', dashboardRouter);
 app.use('/api/designations', designationsRouter);
+app.use('/api/court-cases', courtCasesRouter);
 
 // Health check
 app.get('/health', (req, res) => {

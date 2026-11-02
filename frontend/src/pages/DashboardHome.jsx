@@ -105,8 +105,12 @@ export default function DashboardHome() {
           
           {/* Title & Organization Info */}
           <div className="flex items-start gap-3.5">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#0000FE] to-[#0000C8] flex-shrink-0 flex items-center justify-center shadow-md border border-yellow-300/60">
-              <Shield className="w-6 h-6 text-yellow-300" />
+            <div className="w-12 h-12 rounded-xl bg-white p-1 flex-shrink-0 flex items-center justify-center shadow-md border-2 border-[#C9A15E]/60 ring-1 ring-[#000E89]/10">
+              <img 
+                src="/lokayukta-emblem.png" 
+                alt="Karnataka Lokayukta" 
+                className="w-10 h-10 object-contain select-none pointer-events-none" 
+              />
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
@@ -142,7 +146,7 @@ export default function DashboardHome() {
                 <span className={`text-[10.5px] px-1.5 py-0.2 rounded font-mono font-bold ${
                   viewMode === 'proposals' ? 'bg-white/20 text-white' : 'bg-parchment-3 text-ink-text'
                 }`}>
-                  {overview.totalPetitions || 236}
+                  {(overview.totalPetitions || 0).toLocaleString('en-IN')}
                 </span>
               </button>
 
@@ -161,7 +165,7 @@ export default function DashboardHome() {
                 <span className={`text-[10.5px] px-1.5 py-0.2 rounded font-mono font-bold ${
                   viewMode === 'respondents' ? 'bg-white/20 text-white' : 'bg-parchment-3 text-ink-text'
                 }`}>
-                  {(overview.totalRespondents || 1005).toLocaleString('en-IN')}
+                  {(overview.totalRespondents || 0).toLocaleString('en-IN')}
                 </span>
               </button>
             </div>
@@ -265,8 +269,8 @@ export default function DashboardHome() {
             <span className="font-semibold text-ink-text">Statutory Reconciliation:</span>
             <span className="text-ink-text-soft font-mono">
               {viewMode === 'proposals'
-                ? `214 Dispatched + 6 Awaiting + 16 Returned = 236 Total Proposals`
-                : `906 Dispatched + 21 Awaiting + 78 Returned = 1,005 Total Accused`
+                ? `${overview.proposalsSentToCA || 0} Dispatched + ${overview.proposalsNotSentToCA || 0} Awaiting + ${overview.proposalsBackToDist || 0} Returned = ${(overview.totalPetitions || 0).toLocaleString('en-IN')} Total Proposals`
+                : `${overview.respondentsSentToCA || 0} Dispatched + ${overview.respondentsNotSentToCA || 0} Awaiting + ${overview.respondentsBackToDist || 0} Returned = ${(overview.totalRespondents || 0).toLocaleString('en-IN')} Total Accused`
               }
             </span>
           </div>

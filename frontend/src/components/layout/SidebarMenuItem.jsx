@@ -3,7 +3,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 
 export default function SidebarMenuItem({ icon: Icon, label, path, end, matchPrefix, collapsed, onLinkClick, onClick, active }) {
   const location = useLocation();
-  const baseClass = 'flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-[13.5px] font-medium transition-colors duration-150 w-full';
+  const baseClass = 'flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-[13.5px] font-semibold transition-colors duration-150 w-full tracking-wide';
   const inactiveClass = 'text-[#DCE4FA] hover:bg-white/15 hover:text-white';
   const activeClass = 'bg-white/20 text-white font-bold shadow-sm border-r-4 border-yellow-300';
 

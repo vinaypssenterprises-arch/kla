@@ -3,9 +3,11 @@ const router = express.Router();
 const prisma = require('../prismaClient');
 const redisClient = require('../redisClient');
 const { authMiddleware } = require('./auth');
+const { requireModule } = require('../modulePermissions');
 
 // Middleware to apply auth to all petition routes
 router.use(authMiddleware);
+router.use(requireModule('petitions'));
 
 const getListIncludeOpts = () => ({
   respondents: true,

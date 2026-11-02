@@ -154,7 +154,7 @@ export default function SearchableSelect({
       >
         <div className="flex items-center gap-2 min-w-0">
           <IconComponent className="w-4 h-4 text-brass/80 group-hover:text-brass flex-shrink-0 transition-colors" />
-          <span className={`truncate text-[13.5px] ${selected ? 'font-medium text-ink-text' : 'text-ink-text-faint'}`}>
+          <span className={`truncate text-[13.5px] ${selected ? 'font-semibold text-ink-text' : 'text-ink-text-faint font-normal'}`}>
             {selected ? selected.label : placeholder}
           </span>
         </div>

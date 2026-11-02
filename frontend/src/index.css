@@ -45,14 +45,18 @@
     background: linear-gradient(135deg, var(--parchment) 0%, var(--parchment-2) 100%);
     background-attachment: fixed;
     color: var(--ink-text);
-    font-family: 'Public Sans', system-ui, -apple-system, sans-serif;
+    font-family: 'Plus Jakarta Sans', 'Noto Sans Kannada', system-ui, -apple-system, sans-serif;
     -webkit-font-smoothing: antialiased;
-    line-height: 1.6;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    line-height: 1.55;
+    letter-spacing: -0.012em;
   }
 
-  h1, h2, h3, h4 {
-    font-family: 'Fraunces', Georgia, serif;
-    font-weight: 600;
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Lora', 'Noto Serif Kannada', Georgia, serif;
+    font-weight: 700;
+    letter-spacing: -0.025em;
   }
 
   :focus-visible {
@@ -114,7 +118,7 @@
   /* Buttons */
   .btn {
     @apply relative inline-flex items-center justify-center gap-2 py-[11px] px-5 rounded-s border-none
-      font-sans font-semibold text-[13.5px] tracking-[0.01em] cursor-pointer select-none
+      font-sans font-bold text-[13.5px] tracking-wide cursor-pointer select-none
       whitespace-nowrap transition-all duration-300 ease-out
       active:scale-[0.97]
       disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none disabled:active:scale-100;
@@ -175,7 +179,7 @@
   /* Inputs for main app */
   .app-input {
     @apply w-full bg-[#FFFDF7] border-[1.5px] border-rule text-ink-text py-[11px] px-[14px] rounded-s
-      text-[14px] font-sans transition-all duration-150 outline-none
+      text-[14px] font-sans font-semibold transition-all duration-150 outline-none
       hover:border-[#B7A876]
       focus:border-maroon focus:hover:border-maroon
       disabled:bg-parchment-2 disabled:text-ink-text-faint disabled:cursor-not-allowed disabled:hover:border-rule;
@@ -185,6 +189,7 @@
   }
   .app-input::placeholder {
     color: var(--ink-text-faint);
+    font-weight: 400;
   }
   select.app-input {
     @apply appearance-none bg-no-repeat pr-9 cursor-pointer;
@@ -207,10 +212,10 @@
     @apply w-full border-collapse min-w-[1020px] bg-white rounded-xl overflow-hidden shadow-sm;
   }
   .data-table thead th {
-    @apply text-left text-[11px] uppercase tracking-[0.07em] text-ink-text-soft font-bold py-3.5 px-4 bg-[#F5F2E9] border-b border-[#D8CEB2] select-none;
+    @apply text-left text-[11.5px] uppercase tracking-[0.08em] text-ink-text font-black py-3.5 px-4 bg-[#F5F2E9] border-b-2 border-[#D8CEB2] select-none;
   }
   .data-table td {
-    @apply py-3.5 px-4 text-[13px] text-ink-text border-b border-[#EFEAD9] align-middle transition-colors duration-150;
+    @apply py-3.5 px-4 text-[13.5px] font-medium text-ink-text border-b border-[#EFEAD9] align-middle transition-colors duration-150;
   }
   .data-table tbody tr {
     @apply cursor-pointer transition-colors duration-150 relative bg-white;
@@ -241,7 +246,7 @@
 
   /* Stamps / Official Seal Badges */
   .stamp {
-    @apply inline-flex items-center justify-center py-1 px-[11px] border-[1.5px] border-current rounded font-mono text-[10px] font-semibold tracking-[0.05em] uppercase relative -rotate-[1.2deg] whitespace-nowrap select-none;
+    @apply inline-flex items-center justify-center py-1 px-[11px] border-[1.5px] border-current rounded font-mono text-[10.5px] font-black tracking-[0.06em] uppercase relative -rotate-[1.2deg] whitespace-nowrap select-none;
     box-shadow: 0 1px 2px rgba(16, 24, 38, 0.1);
   }
   .stamp::after {
@@ -259,6 +264,11 @@
   .stamp-danger { color: var(--brick); background: var(--brick-bg); }
   .stamp-info { color: var(--navy-stamp); background: var(--navy-stamp-bg); }
   .stamp-neutral { color: var(--ink-text-soft); background: var(--neutral-bg); }
+
+  /* Form Labels */
+  .form-label {
+    @apply block text-[12.5px] font-bold text-ink-text tracking-tight mb-1;
+  }
 
   /* Soft tinted borders for banners/toasts paired with the *-bg utilities above */
   .border-brick-soft { border-color: rgba(170, 58, 46, 0.3); }
@@ -318,6 +328,30 @@
 @keyframes backdropIn {
   from { opacity: 0; }
   to { opacity: 1; }
+}
+
+/* Module hub — staggered entrance */
+@keyframes hubRise {
+  from { opacity: 0; transform: translateY(18px) scale(0.99); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.hub-rise {
+  animation: hubRise 0.7s cubic-bezier(.16, 1, .3, 1) both;
+}
+/* Module tile primary button — colours come from the tile's --accent / --accent-hover */
+.hub-cta {
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%);
+}
+.hub-cta:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 24px -10px var(--accent);
+}
+.hub-cta:active {
+  transform: translateY(0) scale(0.99);
+}
+@media (prefers-reduced-motion: reduce) {
+  .hub-rise { animation: none; }
+  .hub-cta:hover, .hub-cta:active { transform: none; }
 }
 
 /* Skeleton loaders */

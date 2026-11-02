@@ -769,11 +769,13 @@ export async function exportPetitionsToExcel({
   saveAs(blob, `17-A_Proposals_Status_Register_${new Date().toISOString().slice(0, 10)}.xlsx`);
 }
 
-export async function exportOfficersToExcel({ search = '', districtId = '', designation = '' } = {}) {
+export async function exportOfficersToExcel({ search = '', districtId = '', designation = '', rank = '', postStatus = '' } = {}) {
   const params = new URLSearchParams({ all: 'true' });
   if (search) params.set('search', search);
   if (districtId) params.set('districtId', districtId);
   if (designation) params.set('designation', designation);
+  if (rank) params.set('rank', rank);
+  if (postStatus) params.set('postStatus', postStatus);
 
   const res = await apiFetch(`/officers?${params.toString()}`, {  });
   if (!res.ok) throw new Error('Failed to fetch officers');
@@ -801,14 +803,14 @@ export async function exportOfficersToExcel({ search = '', districtId = '', desi
   });
 
   // TITLE ROWS
-  sheet.mergeCells('A1:J1');
+  sheet.mergeCells('A1:Q1');
   const title1 = sheet.getCell('A1');
   title1.value = '17-A OFFICERS REGISTER';
   title1.font = { name: 'Aptos', size: 16, bold: true, color: { argb: 'FFFFFFFF' } };
   title1.alignment = { horizontal: 'center', vertical: 'middle' };
   title1.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F4E78' } }; 
 
-  sheet.mergeCells('A2:J2');
+  sheet.mergeCells('A2:Q2');
   const title2 = sheet.getCell('A2');
   title2.value = 'Officers Report';
   title2.font = { name: 'Aptos', size: 14, bold: true, color: { argb: 'FF1F4E78' } };
@@ -819,7 +821,7 @@ export async function exportOfficersToExcel({ search = '', districtId = '', desi
   const dateStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).replace(/ /g, '-');
   const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
 
-  sheet.mergeCells('A3:J3');
+  sheet.mergeCells('A3:Q3');
   const title3 = sheet.getCell('A3');
   title3.value = `Generated Date: ${dateStr} ${timeStr}`;
   title3.font = { name: 'Aptos', size: 11, italic: true };
@@ -846,8 +848,15 @@ export async function exportOfficersToExcel({ search = '', districtId = '', desi
     { header: 'District', key: 'district', width: 18 },
     { header: 'Officer Name', key: 'officerName', width: 25 },
     { header: 'Designation', key: 'designation', width: 25 },
-    { header: 'Mobile', key: 'mobile', width: 15 },
-    { header: 'Reporting Date', key: 'reportingDate', width: 18 },
+    { header: 'Govt (CUG) Mobile', key: 'mobile', width: 22 },
+    { header: 'KGID Number', key: 'kgidNumber', width: 16 },
+    { header: 'Date of Joined to Dept', key: 'dateOfJoiningDept', width: 22 },
+    { header: 'Training Place', key: 'trainingPlace', width: 22 },
+    { header: 'Training Period', key: 'trainingPeriod', width: 24 },
+    { header: 'Native Place', key: 'nativePlace', width: 18 },
+    { header: 'Education & Qualification', key: 'educationQualification', width: 26 },
+    { header: 'Reporting Present Office Date', key: 'reportingDate', width: 24 },
+    { header: 'Personal Mobile', key: 'personalMobile', width: 16 },
     { header: 'Present Address', key: 'presentAddress', width: 30 },
     { header: 'Permanent Address', key: 'permanentAddress', width: 30 },
     { header: 'Previous Working Places', key: 'previousPlaces', width: 35 },
@@ -869,7 +878,7 @@ export async function exportOfficersToExcel({ search = '', districtId = '', desi
 
   const rows = [];
   if (officers.length === 0) {
-    sheet.mergeCells('A8:J8');
+    sheet.mergeCells('A8:Q8');
     sheet.getCell('A8').value = 'No officer records available.';
     sheet.getCell('A8').font = { name: 'Aptos', size: 12, italic: true };
     sheet.getCell('A8').alignment = { horizontal: 'center', vertical: 'middle' };
@@ -891,17 +900,33 @@ export async function exportOfficersToExcel({ search = '', districtId = '', desi
     });
 
     officers.forEach((o, idx) => {
+      const trainingPeriod = (o.trainingFromDate || o.trainingToDate)
+        ? `${formatDate(o.trainingFromDate) || '—'} to ${formatDate(o.trainingToDate) || '—'}`
+        : '';
       rows.push({
         sl: idx + 1,
         district: o.district?.name || '',
         officerName: o.name,
         designation: o.designation || '',
         mobile: o.mobile || '',
+        kgidNumber: o.kgidNumber || '',
+        dateOfJoiningDept: formatDate(o.dateOfJoiningDept),
+        trainingPlace: o.trainingPlace || '',
+        trainingPeriod,
+        nativePlace: o.nativePlace || '',
+        educationQualification: o.educationQualification || '',
         reportingDate: formatDate(o.reportingDate),
+        personalMobile: o.personalMobile || '',
         presentAddress: o.presentAddress || '',
-        permanentAddress: o.permanentAddress || '',
         previousPlaces: (o.previousPlaces || [])
-          .map(p => `${p.place}${p.fromYear || p.toYear ? ` (${p.fromYear || ''}${p.toYear ? ' - ' + p.toYear : ''})` : ''}`)
+          .map(p => {
+            const parts = [p.designation, p.policeStation, p.district].filter(Boolean);
+            const label = parts.length > 0 ? parts.join(', ') : (p.place || '—');
+            const fromStr = p.fromDate ? formatDate(p.fromDate) : p.fromYear;
+            const toStr = p.toDate ? formatDate(p.toDate) : p.toYear;
+            const dur = fromStr || toStr ? ` (${fromStr || ''}${toStr ? ' - ' + toStr : ''})` : '';
+            return `${label}${dur}`;
+          })
           .join('\n'),
         remarks: o.remarks || ''
       });
@@ -918,12 +943,12 @@ export async function exportOfficersToExcel({ search = '', districtId = '', desi
         cell.font = { name: 'Aptos', size: 11 };
         
         let alignHoriz = 'center';
-        if ([2, 3, 4, 7, 8, 9, 10].includes(colNumber)) {
+        if ([2, 3, 4, 8, 10, 11, 14, 15, 16, 17].includes(colNumber)) {
           alignHoriz = 'left';
         }
         
         let wrap = false;
-        if ([7, 8, 9, 10].includes(colNumber)) {
+        if ([14, 15, 16, 17].includes(colNumber)) {
           wrap = true;
         }
 
@@ -942,7 +967,7 @@ export async function exportOfficersToExcel({ search = '', districtId = '', desi
 
     sheet.autoFilter = {
       from: { row: 8, column: 1 },
-      to: { row: 8, column: 10 }
+      to: { row: 8, column: 17 }
     };
   }
 
@@ -1474,4 +1499,217 @@ export async function exportDistrictRespondentsStatisticsExcel({
   const cleanYear = isAll ? 'All_Years' : String(focusYear).replace(/[^a-zA-Z0-9_-]/g, '_');
   const fileName = `17-A_District_Respondents_Statistics_${cleanYear}.xlsx`;
   saveAs(blob, fileName);
+}
+
+/* ===========================================================================
+ *  Tabular module reports (officer / court case matrices and registers)
+ *  One sheet per call: title band, generated stamp, table with optional totals row.
+ * ======================================================================== */
+export async function exportTabularReportExcel({
+  bannerTitle = 'KARNATAKA LOKAYUKTA · OFFICERS REGISTER',
+  reportTitle,
+  sheetName = 'Officer Report',
+  scopeLabel = 'State-wide',
+  columns,
+  rows,
+  totalsRow = null,
+  fileSlug = 'Officer_Report'
+}) {
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = localStorage.getItem('fullName') || 'System';
+  workbook.created = new Date();
+
+  const sheet = workbook.addWorksheet(sheetName.slice(0, 31), {
+    pageSetup: {
+      paperSize: 9,
+      orientation: columns.length > 8 ? 'landscape' : 'portrait',
+      fitToPage: true,
+      fitToWidth: 1,
+      fitToHeight: 0,
+      margins: { left: 0.4, right: 0.4, top: 0.6, bottom: 0.6, header: 0.3, footer: 0.3 },
+      horizontalCentered: true
+    },
+    headerFooter: {
+      oddFooter: `&L${reportTitle}&RPage &P of &N`
+    }
+  });
+
+  const lastCol = columns.length;
+  const thin = (argb) => ({ style: 'thin', color: { argb } });
+  const box = (argb) => ({ top: thin(argb), left: thin(argb), bottom: thin(argb), right: thin(argb) });
+
+  const band = (rowNo, value, font, fill) => {
+    sheet.mergeCells(rowNo, 1, rowNo, lastCol);
+    const cell = sheet.getCell(rowNo, 1);
+    cell.value = value;
+    cell.font = { name: 'Aptos', ...font };
+    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fill } };
+    sheet.getRow(rowNo).height = rowNo === 1 ? 26 : 20;
+  };
+
+  const now = new Date();
+  const stamp = `${now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).replace(/ /g, '-')} ${now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}`;
+
+  band(1, bannerTitle, { size: 15, bold: true, color: { argb: 'FFFFFFFF' } }, 'FF000E89');
+  band(2, reportTitle, { size: 13, bold: true, color: { argb: 'FF000E89' } }, 'FFD9E1F2');
+  band(3, `Jurisdiction: ${scopeLabel}   ·   Generated: ${stamp}`, { size: 10.5, italic: true }, 'FFD9E1F2');
+
+  const HEADER_ROW = 5;
+  const header = sheet.getRow(HEADER_ROW);
+  header.values = columns.map(c => c.header);
+  header.height = 32;
+  header.eachCell(cell => {
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F4E78' } };
+    cell.font = { name: 'Aptos', size: 10.5, bold: true, color: { argb: 'FFFFFFFF' } };
+    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+    cell.border = box('FF000000');
+  });
+
+  columns.forEach((c, i) => { sheet.getColumn(i + 1).width = c.width || 14; });
+
+  const writeRow = (record, rowNo, { isTotal = false, zebra = false } = {}) => {
+    const row = sheet.getRow(rowNo);
+    row.values = columns.map(c => record[c.key] ?? '');
+    row.height = 20;
+    row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+      const col = columns[colNumber - 1];
+      cell.font = { name: 'Aptos', size: 10.5, bold: isTotal || col?.bold };
+      cell.alignment = { horizontal: col?.align || 'center', vertical: 'middle', wrapText: !!col?.wrap };
+      cell.border = box(isTotal ? 'FF000000' : 'FFBFBFBF');
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: isTotal ? 'FFFFF2CC' : zebra ? 'FFF2F2F2' : 'FFFFFFFF' } };
+    });
+  };
+
+  if (rows.length === 0) {
+    sheet.mergeCells(HEADER_ROW + 1, 1, HEADER_ROW + 1, lastCol);
+    sheet.getCell(HEADER_ROW + 1, 1).value = 'No records for the selected filters.';
+    sheet.getCell(HEADER_ROW + 1, 1).alignment = { horizontal: 'center' };
+  } else {
+    rows.forEach((r, i) => writeRow(r, HEADER_ROW + 1 + i, { zebra: i % 2 === 1 }));
+    if (totalsRow) writeRow(totalsRow, HEADER_ROW + 1 + rows.length, { isTotal: true });
+    sheet.autoFilter = { from: { row: HEADER_ROW, column: 1 }, to: { row: HEADER_ROW, column: lastCol } };
+  }
+
+  sheet.views = [{ state: 'frozen', xSplit: 1, ySplit: HEADER_ROW, topLeftCell: `B${HEADER_ROW + 1}` }];
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  saveAs(blob, `17-A_${fileSlug}_${now.toISOString().slice(0, 10)}.xlsx`);
+}
+
+/* ===========================================================================
+ *  Court cases register — same column order as the department's court case sheet
+ * ======================================================================== */
+export async function exportCourtCasesToExcel(filters = {}, scopeLabel = 'State-wide') {
+  const params = new URLSearchParams({ all: 'true' });
+  Object.entries(filters).forEach(([k, v]) => { if (v) params.set(k, v); });
+
+  const res = await apiFetch(`/court-cases?${params.toString()}`);
+  if (!res.ok) throw new Error('Failed to fetch court cases');
+  const { data: cases } = await res.json();
+
+  const fmt = (d) => (d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).replace(/ /g, '-') : '');
+
+  await exportTabularReportExcel({
+    bannerTitle: 'KARNATAKA LOKAYUKTA · COURT CASES REGISTER',
+    reportTitle: 'High Court Stay & Court Cases Register',
+    sheetName: 'Court Cases',
+    scopeLabel,
+    columns: [
+      { header: 'Sl. No', key: 'sl', width: 7 },
+      { header: 'District', key: 'district', width: 16, align: 'left', bold: true },
+      { header: 'Cr. No.', key: 'crimeNo', width: 22 },
+      { header: 'Complainant Name', key: 'complainantName', width: 20, align: 'left' },
+      { header: 'Date of Reg FIR', key: 'firRegDate', width: 14 },
+      { header: 'Act', key: 'act', width: 18, align: 'left' },
+      { header: 'Section', key: 'section', width: 18, align: 'left' },
+      { header: 'Type of Case', key: 'caseType', width: 16 },
+      { header: 'Court Name', key: 'courtName', width: 24, align: 'left' },
+      { header: 'Name of the Spl PP', key: 'sppName', width: 22, align: 'left' },
+      { header: 'AGO Details', key: 'agoDetails', width: 30, align: 'left', wrap: true },
+      { header: 'Stage of the Case', key: 'caseStage', width: 18, bold: true },
+      { header: 'CC No', key: 'ccNo', width: 12 },
+      { header: 'IO / Holding IO', key: 'ioName', width: 20, align: 'left' },
+
+      // High Court
+      { header: 'High Court Bench', key: 'hcBench', width: 15 },
+      { header: 'Court Hall', key: 'hcCourtHall', width: 12 },
+      { header: 'HC Petition Type', key: 'hcPetitionType', width: 14 },
+      { header: 'HC Petition No', key: 'hcPetitionNo', width: 16 },
+      { header: 'Date of Petition', key: 'hcPetitionDate', width: 14 },
+      { header: 'Date of Stay', key: 'hcStayDate', width: 14 },
+      { header: 'Stay Type', key: 'hcStayType', width: 18, align: 'left' },
+      { header: 'Info Given to IO by Counsel', key: 'hcCounselInformedDate', width: 16 },
+      { header: 'Petitioner Name', key: 'hcPetitionerName', width: 20, align: 'left' },
+      { header: 'Respondents', key: 'hcRespondents', width: 16 },
+      { header: 'Date of Parawise Remarks by IO', key: 'hcParawiseRemarksDate', width: 16 },
+      { header: 'Next Hearing Date', key: 'hcNextHearingDate', width: 14 },
+      { header: 'Orders of the Court (HC)', key: 'hcCourtOrders', width: 16, bold: true },
+      { header: 'Name of the Counsel (HC)', key: 'hcCounselName', width: 20, align: 'left' },
+      { header: 'Intimation to CLC by Counsel', key: 'hcClcIntimationDate', width: 16 },
+      { header: 'Opinion of CLC', key: 'hcClcOpinion', width: 14 },
+      { header: 'Opinion Date', key: 'hcClcOpinionDate', width: 14 },
+
+      // Supreme Court
+      { header: 'SC Petition Type', key: 'scPetitionType', width: 14 },
+      { header: 'SC Petition No', key: 'scPetitionNo', width: 16 },
+      { header: 'SC Date of Petition', key: 'scPetitionDate', width: 14 },
+      { header: 'SC Petitioner Name', key: 'scPetitionerName', width: 20, align: 'left' },
+      { header: 'SC Respondents', key: 'scRespondents', width: 20, align: 'left' },
+      { header: 'SC Hearing Date', key: 'scHearingDate', width: 14 },
+      { header: 'SC Orders of Court', key: 'scCourtOrders', width: 20, align: 'left' },
+      { header: 'SC Name of Counsel', key: 'scCounselName', width: 20, align: 'left' }
+    ],
+    rows: cases.map((c, idx) => ({
+      sl: idx + 1,
+      district: c.district?.name || '',
+      crimeNo: c.crimeNo,
+      complainantName: c.complainantName || '',
+      firRegDate: fmt(c.firRegDate),
+      act: (c.actSections && c.actSections.length > 0)
+        ? Array.from(new Set(c.actSections.map(a => a.act).filter(Boolean))).join('; ')
+        : (c.act || ''),
+      section: (c.actSections && c.actSections.length > 0)
+        ? c.actSections.map(a => a.section).filter(Boolean).join(', ')
+        : (c.section || c.sectionOfLaw || ''),
+      caseType: c.caseType || '',
+      courtName: c.courtName || '',
+      sppName: c.sppName || '',
+      agoDetails: (c.agos || []).map(a => `${a.name || 'AGO'}${a.designation ? ` (${a.designation})` : ''}${a.department ? ` - ${a.department}` : ''}`).join('; '),
+      caseStage: c.caseStage || '',
+      ccNo: c.ccNo || '',
+      ioName: c.ioName || '',
+
+      // High Court
+      hcBench: c.hcBench || '',
+      hcCourtHall: c.hcCourtHall || '',
+      hcPetitionType: c.hcPetitionType || '',
+      hcPetitionNo: c.hcPetitionNo || c.wpCrlpNo || '',
+      hcPetitionDate: fmt(c.hcPetitionDate),
+      hcStayDate: fmt(c.hcStayDate || c.stayDate),
+      hcStayType: c.hcStayType || c.stayType || '',
+      hcCounselInformedDate: fmt(c.hcCounselInformedDate || c.sppInformedDate),
+      hcPetitionerName: c.hcPetitionerName || '',
+      hcRespondents: c.hcRespondents || '',
+      hcParawiseRemarksDate: fmt(c.hcParawiseRemarksDate),
+      hcNextHearingDate: fmt(c.hcNextHearingDate),
+      hcCourtOrders: c.hcCourtOrders || c.hcCaseStatus || 'Pending',
+      hcCounselName: c.hcCounselName || '',
+      hcClcIntimationDate: fmt(c.hcClcIntimationDate),
+      hcClcOpinion: c.hcClcOpinion || '',
+      hcClcOpinionDate: fmt(c.hcClcOpinionDate),
+
+      // Supreme Court
+      scPetitionType: c.scPetitionType || '',
+      scPetitionNo: c.scPetitionNo || c.slpNo || '',
+      scPetitionDate: fmt(c.scPetitionDate),
+      scPetitionerName: c.scPetitionerName || '',
+      scRespondents: c.scRespondents || '',
+      scHearingDate: fmt(c.scHearingDate),
+      scCourtOrders: c.scCourtOrders || c.scCaseStatus || '',
+      scCounselName: c.scCounselName || ''
+    })),
+    fileSlug: 'Court_Cases_Register'
+  });
 }

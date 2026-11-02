@@ -539,28 +539,43 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments,
   };
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
+    <div className="w-full">
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-4 w-full bg-[#FFFDF7] border border-rule rounded-m p-5 shadow-soft">
         <div>
-          <h2 className="text-[21px] font-serif font-semibold text-ink-text">{isEdit ? `Petition: ${initialData.petitionNo}` : 'New Petition'}</h2>
+          <button
+            type="button"
+            onClick={() => navigate('/register')}
+            className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-ink-text-soft hover:text-ink-text mb-2 transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" /> Back to Petitions
+          </button>
+          <h2 className="text-[22px] font-serif font-bold text-ink-text">
+            {isEdit ? `Edit Petition — ${initialData?.petitionNo || ''}` : 'Register New Petition'}
+          </h2>
           <div className="flex items-center gap-2 mt-1">
             <span className="stamp stamp-neutral">{status.replace(/_/g, ' ')}</span>
-            {isEdit && <span className="text-[12px] text-ink-text-faint">Created by {initialData.createdBy?.fullName || 'User'}</span>}
+            {isEdit && <span className="text-[12px] text-ink-text-faint">Created by {initialData?.createdBy?.fullName || 'User'}</span>}
             {isAdminEdit && <span className="stamp stamp-warning font-semibold">Admin Edit Mode</span>}
           </div>
         </div>
-        <div className="flex items-center gap-2.5">
-          <button type="button" className="btn btn-secondary" onClick={() => navigate('/register')}>
-            <ArrowLeft className="w-[15px] h-[15px]" /> Back
+        <div className="flex items-center gap-3">
+          <button type="button" className="btn btn-secondary px-5" onClick={() => navigate('/register')} disabled={isSubmitting}>
+            Cancel
           </button>
-          {isAdminEdit && (
+          {(isAdmin || status === 'DRAFT' || status === '17A_RETURNED') && (
             <button
               type="button"
-              className="btn btn-primary"
-              onClick={() => doAction('ADMIN_UPDATE')}
+              className="btn btn-primary px-6 shadow-sm"
+              onClick={() => doAction(
+                isAdminEdit ? 'ADMIN_UPDATE'
+                : isAdminNewPetition ? 'ADMIN_CREATE_FULL'
+                : status === 'DRAFT' ? 'CREATE_SUBMIT'
+                : 'RESUBMIT'
+              )}
               disabled={isSubmitting}
             >
-              <Save className="w-4 h-4" /> Save Changes
+              <Save className="w-4 h-4" />
+              {isAdminEdit ? 'Save Changes' : isAdminNewPetition ? 'Create Petition' : status === 'DRAFT' ? 'Submit to Supervisor' : 'Resubmit Petition'}
             </button>
           )}
         </div>
@@ -572,7 +587,7 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments,
         </div>
       )}
 
-      <div className="flex flex-col gap-5 max-w-[1400px]">
+      <div className="flex flex-col gap-5 w-full">
         {/* I. Petition Details */}
         <div className="bg-[#FFFDF7] border border-rule rounded-m p-6 shadow-soft">
           <div className="flex items-center justify-between mb-[18px] flex-wrap gap-3">
@@ -613,7 +628,7 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments,
             {/* 1. District */}
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center justify-between">
-                <label className="text-[12.5px] font-semibold text-ink-text-soft">
+                <label className="text-[12.5px] font-bold text-ink-text">
                   District <span className="text-brick">*</span>
                 </label>
                 {districtCode && (
@@ -641,7 +656,7 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments,
             {/* 2. Type */}
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center justify-between">
-                <label className="text-[12.5px] font-semibold text-ink-text-soft">
+                <label className="text-[12.5px] font-bold text-ink-text">
                   Type <span className="text-brick">*</span>
                 </label>
                 {typeCode && (
@@ -650,7 +665,7 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments,
                   </span>
                 )}
               </div>
-              <select className="app-input" {...register('type')} disabled={!canEditIandII}>
+              <select className="app-input font-bold" {...register('type')} disabled={!canEditIandII}>
                 <option value="">Select Type</option>
                 <option value="Complaint">Complaint (COM)</option>
                 <option value="Suo-motu">Suo-motu (SUO)</option>
@@ -660,7 +675,7 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments,
             {/* 3. Case Number (Strict 4-digit entry) */}
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center justify-between">
-                <label className="text-[12.5px] font-semibold text-ink-text-soft">
+                <label className="text-[12.5px] font-bold text-ink-text">
                   Case No. <span className="text-brick">*</span>
                 </label>
                 <span className="text-[11px] text-ink-text-faint font-mono">4 digits (0001-9999)</span>
@@ -688,7 +703,7 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments,
             {/* 4. Year (Strict 4-digit YYYY entry) */}
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center justify-between">
-                <label className="text-[12.5px] font-semibold text-ink-text-soft">
+                <label className="text-[12.5px] font-bold text-ink-text">
                   Year <span className="text-brick">*</span>
                 </label>
                 <span className="text-[11px] text-ink-text-faint font-mono">4 digits (YYYY)</span>
@@ -750,13 +765,13 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments,
 
             {/* Petitioner Information */}
             <div className="flex flex-col gap-1.5 sm:col-span-2">
-              <label className="text-[12.5px] font-semibold text-ink-text-soft">
+              <label className="text-[12.5px] font-bold text-ink-text">
                 Name of the Petitioner <span className="text-brick">*</span>
               </label>
               <input type="text" className="app-input" {...register('petitionerName')} disabled={!canEditIandII} />
             </div>
             <div className="flex flex-col gap-1.5 sm:col-span-2">
-              <label className="text-[12.5px] font-semibold text-ink-text-soft">
+              <label className="text-[12.5px] font-bold text-ink-text">
                 Address of the Petitioner
               </label>
               <input type="text" className="app-input" {...register('petitionerAddress')} disabled={!canEditIandII} />
@@ -764,7 +779,7 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments,
             {/* SIR Officer Name */}
             <div className="flex flex-col gap-1.5 sm:col-span-1">
               <div className="flex items-center justify-between">
-                <label className="text-[12.5px] font-semibold text-ink-text-soft flex items-center gap-1.5">
+                <label className="text-[12.5px] font-bold text-ink-text flex items-center gap-1.5">
                   <span>SIR Officer Name</span>
                   {isOldOfficer && (
                     <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.2 rounded bg-amber-100 text-amber-900 border border-amber-300">
@@ -780,7 +795,7 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments,
                         setIsOldOfficer(false);
                         setValue('sirOfficerName', '', { shouldValidate: true });
                       }}
-                      className="text-[11px] font-semibold text-[#000E89] hover:underline flex items-center gap-1 cursor-pointer"
+                      className="text-[11px] font-bold text-[#000E89] hover:underline flex items-center gap-1 cursor-pointer"
                       title="Switch back to selecting an officer from list"
                     >
                       <List className="w-3.5 h-3.5" />
@@ -793,7 +808,7 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments,
                         setIsOldOfficer(true);
                         setValue('sirOfficerName', '', { shouldValidate: true });
                       }}
-                      className="text-[11px] font-semibold text-ink-text-soft hover:text-[#000E89] hover:underline flex items-center gap-1 cursor-pointer"
+                      className="text-[11px] font-bold text-ink-text-soft hover:text-[#000E89] hover:underline flex items-center gap-1 cursor-pointer"
                       title="Officer not in list? Type name manually"
                     >
                       <UserPlus className="w-3 h-3 text-amber-700" />
@@ -807,7 +822,7 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments,
                 <div className="space-y-1">
                   <input
                     type="text"
-                    className="app-input font-medium"
+                    className="app-input font-bold"
                     placeholder="Type officer name…"
                     {...register('sirOfficerName')}
                     disabled={!canEditIandII}
@@ -835,7 +850,7 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments,
               )}
             </div>
             <div className="flex flex-col gap-1.5 sm:col-span-1">
-              <label className="text-[12.5px] font-semibold text-ink-text-soft">
+              <label className="text-[12.5px] font-bold text-ink-text">
                 Officer Rank
               </label>
               <Controller
@@ -964,19 +979,19 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments,
               <div className="text-[11px] uppercase tracking-[0.06em] font-semibold text-ink-text-faint mb-3">Add a Respondent</div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 items-end">
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[11.5px] font-semibold text-ink-text-soft">Respondent Name</label>
+                  <label className="text-[11.5px] font-bold text-ink-text">Respondent Name</label>
                   <input type="text" className="app-input" placeholder="Respondent name" value={newResp.name} onChange={e => setNewResp({ ...newResp, name: e.target.value })} />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[11.5px] font-semibold text-ink-text-soft">Designation</label>
+                  <label className="text-[11.5px] font-bold text-ink-text">Designation</label>
                   <input type="text" className="app-input" placeholder="Designation" value={newResp.designation} onChange={e => setNewResp({ ...newResp, designation: e.target.value })} />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[11.5px] font-semibold text-ink-text-soft">Office</label>
+                  <label className="text-[11.5px] font-bold text-ink-text">Office</label>
                   <input type="text" className="app-input" placeholder="Office" value={newResp.office} onChange={e => setNewResp({ ...newResp, office: e.target.value })} />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[11.5px] font-semibold text-ink-text-soft">Department</label>
+                  <label className="text-[11.5px] font-bold text-ink-text">Department</label>
                   <SearchableSelect
                     value={newResp.department}
                     onChange={v => setNewResp({ ...newResp, department: v, subDepartment: '' })}
@@ -986,7 +1001,7 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments,
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[11.5px] font-semibold text-ink-text-soft">Sub Department</label>
+                  <label className="text-[11.5px] font-bold text-ink-text">Sub Department</label>
                   <SearchableSelect
                     value={newResp.subDepartment}
                     onChange={v => setNewResp({ ...newResp, subDepartment: v })}
@@ -1006,16 +1021,16 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments,
         {/* III. 17-A Proposal */}
         {showIII && (
           <div className="bg-[#FFFDF7] border border-rule rounded-m p-6 shadow-soft">
-            <h4 className="text-[15px] text-ink-text mb-[18px] font-serif font-semibold flex items-baseline gap-2">
-              <span className="font-mono text-[13px] text-brass font-semibold">III.</span> 17-A Proposal
+            <h4 className="text-[16px] text-ink-text mb-[18px] font-serif font-bold tracking-tight flex items-baseline gap-2">
+              <span className="font-mono text-[13px] text-brass font-bold">III.</span> 17-A Proposal
             </h4>
             {isAdmin ? (
               /* Admin: direct data-entry & edit in all states */
               <div className="flex flex-col gap-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[12.5px] font-semibold text-ink-text-soft">Proposal Status</label>
-                    <select className="app-input" {...register('proposalStatus')}>
+                    <label className="text-[12.5px] font-bold text-ink-text">Proposal Status</label>
+                    <select className="app-input font-bold" {...register('proposalStatus')}>
                       <option value="">Select status</option>
                       {proposalStatuses.length > 0 ? (
                         proposalStatuses.map(s => (
@@ -1032,8 +1047,8 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments,
                   </div>
                   {!isReturnedWithRemarks && (
                     <div className="flex flex-col gap-1.5">
-                      <label className="text-[12.5px] font-semibold text-ink-text-soft">Date Sent to CA</label>
-                      <input type="date" className="app-input" {...register('proposalSentDate')} />
+                      <label className="text-[12.5px] font-bold text-ink-text">Date Sent to CA</label>
+                      <input type="date" className="app-input font-bold" {...register('proposalSentDate')} />
                     </div>
                   )}
                 </div>
@@ -1062,7 +1077,7 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments,
               <div className="p-4 bg-parchment border border-dashed border-rule rounded-s">
                 <p className="text-[13px] text-ink-text-soft mb-4">Review the petition details above and choose an action.</p>
                 <div className="flex flex-col gap-1.5 mb-4">
-                  <label className="text-[12.5px] font-semibold text-ink-text-soft">Remarks (Required for Return)</label>
+                  <label className="text-[12.5px] font-bold text-ink-text">Remarks (Required for Return)</label>
                   <textarea className="app-input" rows={2} value={actionRemarks} onChange={e => setActionRemarks(e.target.value)} />
                 </div>
                 <div className="flex flex-wrap gap-2.5">
@@ -1070,8 +1085,8 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments,
                     Return with Remarks
                   </button>
                   <div className="flex items-center gap-2.5 ml-auto">
-                    <span className="text-[12px] text-ink-text-faint">Date sent to CA:</span>
-                    <input type="date" className="app-input py-[5px] text-[12px]" {...register('proposalSentDate')} />
+                    <span className="text-[12px] text-ink-text-faint font-bold">Date sent to CA:</span>
+                    <input type="date" className="app-input py-[5px] text-[12px] font-bold" {...register('proposalSentDate')} />
                     <button type="button" className="btn btn-primary" onClick={() => doAction('ACCEPT_17A')} disabled={isSubmitting}>
                       <CheckCircle2 className="w-4 h-4" /> Accept Proposal
                     </button>
@@ -1081,12 +1096,12 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments,
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[12.5px] font-semibold text-ink-text-soft">Status</label>
-                  <div className="text-[13.5px] font-semibold text-ink-text">{initialData.proposalStatus || '—'}</div>
+                  <label className="text-[12.5px] font-bold text-ink-text">Status</label>
+                  <div className="text-[13.5px] font-bold text-ink-text">{initialData.proposalStatus || '—'}</div>
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[12.5px] font-semibold text-ink-text-soft">Sent to CA on</label>
-                  <div className="text-[13.5px] text-ink-text">{initialData.proposalSentDate ? new Date(initialData.proposalSentDate).toLocaleDateString('en-IN') : '—'}</div>
+                  <label className="text-[12.5px] font-bold text-ink-text">Sent to CA on</label>
+                  <div className="text-[13.5px] font-bold text-ink-text">{initialData.proposalSentDate ? new Date(initialData.proposalSentDate).toLocaleDateString('en-IN') : '—'}</div>
                 </div>
               </div>
             )}
@@ -1096,21 +1111,21 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments,
         {/* IV. Competent Authority (Per Respondent) */}
         {showIV && (
           <div className="bg-[#FFFDF7] border border-rule rounded-m p-6 shadow-soft">
-            <h4 className="text-[15px] text-ink-text mb-[18px] font-serif font-semibold flex items-baseline gap-2">
-              <span className="font-mono text-[13px] text-brass font-semibold">IV.</span> Competent Authority (Per Respondent)
+            <h4 className="text-[16px] text-ink-text mb-[18px] font-serif font-bold tracking-tight flex items-baseline gap-2">
+              <span className="font-mono text-[13px] text-brass font-bold">IV.</span> Competent Authority (Per Respondent)
             </h4>
             {respondentFields.map((field, index) => (
               <div key={field.id} className="p-4 border border-rule rounded-lg mb-3 bg-parchment last:mb-0">
-                <div className="font-semibold text-[14px] text-maroon mb-3 border-b border-dashed border-rule pb-2">
-                  {field.name} <span className="text-[12px] font-normal text-ink-text-soft ml-2">({field.designation})</span>
+                <div className="font-bold text-[14px] text-maroon mb-3 border-b border-dashed border-rule pb-2">
+                  {field.name} <span className="text-[12px] font-medium text-ink-text-soft ml-2">({field.designation})</span>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[12.5px] font-semibold text-ink-text-soft">CA Designation</label>
+                    <label className="text-[12.5px] font-bold text-ink-text">CA Designation</label>
                     <input type="text" className="app-input" {...register(`respondents.${index}.caDesignation`)} disabled={!canEditIV} />
                   </div>
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[12.5px] font-semibold text-ink-text-soft">CA Department</label>
+                    <label className="text-[12.5px] font-bold text-ink-text">CA Department</label>
                     <Controller
                       name={`respondents.${index}.caDepartment`}
                       control={control}
@@ -1127,7 +1142,7 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments,
                     />
                   </div>
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[12.5px] font-semibold text-ink-text-soft">CA Sub Department</label>
+                    <label className="text-[12.5px] font-bold text-ink-text">CA Sub Department</label>
                     <Controller
                       name={`respondents.${index}.caSubDepartment`}
                       control={control}
@@ -1144,7 +1159,7 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments,
                     />
                   </div>
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[12.5px] font-semibold text-ink-text-soft">CA Office</label>
+                    <label className="text-[12.5px] font-bold text-ink-text">CA Office</label>
                     <input type="text" className="app-input" {...register(`respondents.${index}.caPlace`)} disabled={!canEditIV} />
                   </div>
                 </div>
@@ -1163,17 +1178,17 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments,
         {/* V. 17-A Permission */}
         {showV && (
           <div className="bg-[#FFFDF7] border border-rule rounded-m p-6 shadow-soft">
-            <h4 className="text-[15px] text-ink-text mb-[18px] font-serif font-semibold flex items-baseline gap-2">
-              <span className="font-mono text-[13px] text-brass font-semibold">V.</span> 17-A Permission (Per Respondent)
+            <h4 className="text-[16px] text-ink-text mb-[18px] font-serif font-bold tracking-tight flex items-baseline gap-2">
+              <span className="font-mono text-[13px] text-brass font-bold">V.</span> 17-A Permission (Per Respondent)
             </h4>
             <div className="flex flex-col gap-3">
               {respondentFields.map((field, index) => (
                 <div key={field.id} className="py-3 border-b border-dashed border-parchment-3 last:border-b-0">
-                  <div className="font-semibold text-[14px] text-ink-text mb-3">{field.name}</div>
+                  <div className="font-bold text-[14px] text-ink-text mb-3">{field.name}</div>
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
                     <div className="flex flex-col gap-1.5">
-                      <label className="text-[11.5px] font-semibold text-ink-text-soft">Status</label>
-                      <select className="app-input" {...register(`respondents.${index}.permissionStatus`)} disabled={!canEditV}>
+                      <label className="text-[11.5px] font-bold text-ink-text">Status</label>
+                      <select className="app-input font-bold" {...register(`respondents.${index}.permissionStatus`)} disabled={!canEditV}>
                         <option value="">Status</option>
                         <option value="Obtain">Obtain</option>
                         <option value="Reject">Reject</option>
@@ -1181,16 +1196,16 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments,
                       </select>
                     </div>
                     <div className="flex flex-col gap-1.5">
-                      <label className="text-[11.5px] font-semibold text-ink-text-soft">Sent Date</label>
-                      <input type="date" className="app-input" title="Permission Sent Date" {...register(`respondents.${index}.permissionSentDate`)} disabled={!canEditV} />
+                      <label className="text-[11.5px] font-bold text-ink-text">Sent Date</label>
+                      <input type="date" className="app-input font-bold" title="Permission Sent Date" {...register(`respondents.${index}.permissionSentDate`)} disabled={!canEditV} />
                     </div>
                     <div className="flex flex-col gap-1.5">
-                      <label className="text-[11.5px] font-semibold text-ink-text-soft">PERMISSION RECEIVED FROM CA</label>
-                      <input type="date" className="app-input" title="Permission Received from CA" {...register(`respondents.${index}.permissionReceivedFromCA`)} disabled={!canEditV} />
+                      <label className="text-[11.5px] font-bold text-ink-text">PERMISSION RECEIVED FROM CA</label>
+                      <input type="date" className="app-input font-bold" title="Permission Received from CA" {...register(`respondents.${index}.permissionReceivedFromCA`)} disabled={!canEditV} />
                     </div>
                     <div className="flex flex-col gap-1.5">
-                      <label className="text-[11.5px] font-semibold text-ink-text-soft">CA SENT TO UNIT</label>
-                      <input type="date" className="app-input" title="CA Sent to Unit" {...register(`respondents.${index}.caSentToUnit`)} disabled={!canEditV} />
+                      <label className="text-[11.5px] font-bold text-ink-text">CA SENT TO UNIT</label>
+                      <input type="date" className="app-input font-bold" title="CA Sent to Unit" {...register(`respondents.${index}.caSentToUnit`)} disabled={!canEditV} />
                     </div>
                   </div>
                 </div>
@@ -1209,20 +1224,20 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments,
         {/* VI. Preliminary Enquiry */}
         {showVI && (
           <div className="bg-[#FFFDF7] border border-rule rounded-m p-6 shadow-soft">
-            <h4 className="text-[15px] text-ink-text mb-[18px] font-serif font-semibold flex items-baseline gap-2">
-              <span className="font-mono text-[13px] text-brass font-semibold">VI.</span> Preliminary Enquiry
+            <h4 className="text-[16px] text-ink-text mb-[18px] font-serif font-bold tracking-tight flex items-baseline gap-2">
+              <span className="font-mono text-[13px] text-brass font-bold">VI.</span> Preliminary Enquiry
             </h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
               <div className="flex flex-col gap-1.5">
-                <label className="text-[12.5px] font-semibold text-ink-text-soft">PE No</label>
-                <input type="text" className="app-input" {...register('peNo')} disabled={!canEditVI} />
+                <label className="text-[12.5px] font-bold text-ink-text">PE No</label>
+                <input type="text" className="app-input font-mono font-bold" {...register('peNo')} disabled={!canEditVI} />
               </div>
               <div className="flex flex-col gap-1.5">
-                <label className="text-[12.5px] font-semibold text-ink-text-soft">Date of PE Registration</label>
-                <input type="date" className="app-input" {...register('peRegDate')} disabled={!canEditVI} />
+                <label className="text-[12.5px] font-bold text-ink-text">Date of PE Registration</label>
+                <input type="date" className="app-input font-bold" {...register('peRegDate')} disabled={!canEditVI} />
               </div>
               <div className="flex flex-col gap-1.5">
-                <label className="text-[12.5px] font-semibold text-ink-text-soft">PE Enquery Officer</label>
+                <label className="text-[12.5px] font-bold text-ink-text">PE Enquery Officer</label>
                 <Controller
                   name="sirEo"
                   control={control}
@@ -1239,7 +1254,7 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments,
                 />
               </div>
               <div className="flex flex-col gap-1.5">
-                <label className="text-[12.5px] font-semibold text-ink-text-soft">PE Enquery Officer Designation</label>
+                <label className="text-[12.5px] font-bold text-ink-text">PE Enquery Officer Designation</label>
                 <Controller
                   name="sirEoDesignation"
                   control={control}
@@ -1256,8 +1271,8 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments,
                 />
               </div>
               <div className="flex flex-col gap-1.5">
-                <label className="text-[12.5px] font-semibold text-ink-text-soft">PE Status</label>
-                <select className="app-input" {...register('peStatus')} disabled={!canEditVI}>
+                <label className="text-[12.5px] font-bold text-ink-text">PE Status</label>
+                <select className="app-input font-bold" {...register('peStatus')} disabled={!canEditVI}>
                   <option value="">Select status</option>
                   {peStatuses.length > 0 ? (
                     peStatuses.map(s => (
@@ -1274,8 +1289,8 @@ function PetitionWorkflow({ initialData, districts, departments, subDepartments,
                 </select>
               </div>
               <div className="flex flex-col gap-1.5">
-                <label className="text-[12.5px] font-semibold text-ink-text-soft">Date of PE report sent to HQ</label>
-                <input type="date" className="app-input" {...register('peReportSentDate')} disabled={!canEditVI} />
+                <label className="text-[12.5px] font-bold text-ink-text">Date of PE report sent to HQ</label>
+                <input type="date" className="app-input font-bold" {...register('peReportSentDate')} disabled={!canEditVI} />
               </div>
             </div>
             {canEditVI && !isAdmin && (

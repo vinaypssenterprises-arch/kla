@@ -427,8 +427,12 @@ export default function RegisterList() {
       {/* Page Header with Grand Blinking Live Records Counter */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-5 gap-4 bg-[#FFFDF7] p-4 sm:p-5 rounded-2xl border border-[#D5CCA8] shadow-sm">
         <div className="flex items-start sm:items-center gap-3.5 flex-wrap">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#0000FE] to-[#0000C8] flex-shrink-0 flex items-center justify-center shadow-md border border-yellow-300/60">
-            <Shield className="w-6 h-6 text-yellow-300" />
+          <div className="w-12 h-12 rounded-xl bg-white p-1 flex-shrink-0 flex items-center justify-center shadow-md border-2 border-[#C9A15E]/60 ring-1 ring-[#000E89]/10">
+            <img 
+              src="/lokayukta-emblem.png" 
+              alt="Karnataka Lokayukta" 
+              className="w-10 h-10 object-contain select-none pointer-events-none" 
+            />
           </div>
           <div>
             <div className="flex items-center gap-2 mb-1 flex-wrap">
@@ -1280,11 +1284,11 @@ export default function RegisterList() {
 
                         {/* Petitioner */}
                         <td className={`max-w-[180px] align-middle ${tableDensity === 'compact' ? 'py-1 px-2.5' : 'py-2 px-3'}`}>
-                          <div className="font-semibold text-ink-text text-[12.5px] leading-snug line-clamp-2 break-words" title={entry.petitionerName}>
+                          <div className="font-bold text-ink-text text-[13px] leading-snug line-clamp-2 break-words" title={entry.petitionerName}>
                             {entry.petitionerName}
                           </div>
                           {entry.petitionerAddress && (
-                            <div className="text-[10.5px] text-ink-text-faint truncate mt-0.5" title={entry.petitionerAddress}>
+                            <div className="text-[11px] text-ink-text-soft font-medium truncate mt-0.5" title={entry.petitionerAddress}>
                               {entry.petitionerAddress}
                             </div>
                           )}
@@ -1315,7 +1319,7 @@ export default function RegisterList() {
                                         setOfficerFilter(r.name);
                                         setOfficerRoleFilter('respondent');
                                       }}
-                                      className="font-semibold text-ink-text hover:text-[#000E89] hover:underline cursor-pointer text-left break-words inline"
+                                      className="font-bold text-ink-text hover:text-[#000E89] hover:underline cursor-pointer text-left break-words inline text-[12.5px]"
                                       title={`Click to filter cases by respondent: ${r.name}`}
                                     >
                                       {r.name}
@@ -1618,7 +1622,7 @@ export default function RegisterList() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-2 flex-wrap">
                     <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#C9A15E]/20 text-[#F5DEB3] border border-[#C9A15E]/40 text-[10.5px] font-bold tracking-widest uppercase">
-                      <Shield className="w-3 h-3 text-[#C9A15E]" />
+                      <img src="/lokayukta-emblem.png" alt="Lokayukta" className="w-3.5 h-3.5 object-contain" />
                       Karnataka Lokayukta · Sec. 17-A Case Docket
                     </span>
                     <span className="text-[11px] text-white/60 font-mono">

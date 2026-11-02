@@ -3,6 +3,9 @@ const router = express.Router();
 const bcrypt = require('bcryptjs');
 const prisma = require('../prismaClient');
 const { authMiddleware, adminMiddleware } = require('./auth');
+const {
+  MODULE_KEYS, DEFAULT_USER_MODULES, sanitizeModules, invalidateUserAccess
+} = require('../modulePermissions');
 
 // All user management routes require an authenticated admin (except by-designation if needed for non-admins, but let's keep it admin for now, or just authMiddleware if normal users need it. I'll make by-designation require auth, but move it before the adminMiddleware if necessary. Actually, the prompt doesn't specify. I will keep it under adminMiddleware since it's for user management form, but wait, normal users might need to create users? No, user management is admin. I'll put it all under authMiddleware, and check admin inside routes where needed, or just keep it as is.)
 
@@ -47,6 +50,7 @@ const userSelect = {
   supervisorUserId: true,
   districtId: true,
   isHeadOffice: true,
+  modules: true,
   createdAt: true,
   updatedAt: true,
   designation: { select: { id: true, name: true } },
@@ -57,6 +61,18 @@ const userSelect = {
 
 const VALID_ROLES = ['admin', 'user', 'viewer'];
 const normalizeRole = (role) => (VALID_ROLES.includes(role) ? role : 'user');
+
+// Admins always get every module. Others need at least one; `undefined` means the client did not
+// send module access (older UI), in which case create falls back to the default and update keeps it.
+const resolveModules = (role, modules, fallback) => {
+  if (normalizeRole(role) === 'admin') return { modules: [...MODULE_KEYS] };
+  if (modules === undefined) return { modules: fallback };
+  const clean = sanitizeModules(modules);
+  if (clean.length === 0) {
+    return { error: 'Select at least one module for this user. To block all access, set the account to Inactive.' };
+  }
+  return { modules: clean };
+};
 
 // List all users
 router.get('/', async (req, res) => {
@@ -78,8 +94,11 @@ router.post('/', async (req, res) => {
     const { 
       email, password, fullName, kgidNumber, 
       designationId, supervisorDesignationId, supervisorUserId, districtId,
-      role, isActive, isHeadOffice 
+      role, isActive, isHeadOffice, modules
     } = req.body;
+
+    const moduleAccess = resolveModules(role, modules, [...DEFAULT_USER_MODULES]);
+    if (moduleAccess.error) return res.status(400).json({ error: moduleAccess.error });
 
     if (!email || !password || !fullName || !kgidNumber || !designationId || !supervisorDesignationId) {
       return res.status(400).json({ error: 'Missing mandatory fields' });
@@ -149,6 +168,7 @@ router.post('/', async (req, res) => {
         supervisorUserId: supervisorUserId || null,
         districtId: finalIsHeadOffice ? null : finalDistrictId,
         role: normalizeRole(role),
+        modules: moduleAccess.modules,
         isActive: isActive !== false,
         isHeadOffice: finalIsHeadOffice
       },
@@ -162,6 +182,44 @@ router.post('/', async (req, res) => {
   }
 });
 
+// Grant or revoke one module for many users at once. Admin accounts are skipped (they always
+// have every module). Responds with how many users changed and how many are left with no module.
+router.patch('/modules', async (req, res) => {
+  try {
+    const { userIds, module, enabled } = req.body;
+    if (!Array.isArray(userIds) || userIds.length === 0) {
+      return res.status(400).json({ error: 'Select at least one user' });
+    }
+    if (!MODULE_KEYS.includes(module)) {
+      return res.status(400).json({ error: `Module must be one of: ${MODULE_KEYS.join(', ')}` });
+    }
+
+    const targets = await prisma.user.findMany({
+      where: { id: { in: userIds.map(String) }, role: { not: 'admin' } },
+      select: { id: true, modules: true }
+    });
+    const changes = targets
+      .map(u => {
+        const current = sanitizeModules(u.modules);
+        const next = enabled ? sanitizeModules([...current, module]) : current.filter(m => m !== module);
+        return { id: u.id, next, changed: next.length !== current.length };
+      })
+      .filter(c => c.changed);
+
+    await prisma.$transaction(changes.map(c => prisma.user.update({ where: { id: c.id }, data: { modules: c.next } })));
+    await invalidateUserAccess();
+
+    res.json({
+      updated: changes.length,
+      skippedAdmins: userIds.length - targets.length,
+      withoutModules: changes.filter(c => c.next.length === 0).length
+    });
+  } catch (error) {
+    console.error('Bulk module update error:', error);
+    res.status(500).json({ error: 'Failed to update module access' });
+  }
+});
+
 // Update a user
 router.put('/:id', async (req, res) => {
   try {
@@ -169,8 +227,11 @@ router.put('/:id', async (req, res) => {
     const { 
       email, password, fullName, kgidNumber, 
       designationId, supervisorDesignationId, supervisorUserId, districtId,
-      role, isActive, isHeadOffice
+      role, isActive, isHeadOffice, modules
     } = req.body;
+
+    const moduleAccess = resolveModules(role, modules, undefined);
+    if (moduleAccess.error) return res.status(400).json({ error: moduleAccess.error });
 
     if (!email || !fullName || !kgidNumber || !designationId || !supervisorDesignationId) {
       return res.status(400).json({ error: 'Missing mandatory fields' });
@@ -221,6 +282,7 @@ router.put('/:id', async (req, res) => {
       supervisorUserId: supervisorUserId || null,
       districtId: finalIsHeadOffice ? null : finalDistrictId,
       role: normalizeRole(role),
+      ...(moduleAccess.modules ? { modules: moduleAccess.modules } : {}),
       isActive: isActive !== false,
       isHeadOffice: finalIsHeadOffice
     };
@@ -238,6 +300,8 @@ router.put('/:id', async (req, res) => {
       select: userSelect
     });
 
+    // Role, status and module changes take effect on the user's next request
+    await invalidateUserAccess(id);
     res.json(user);
   } catch (error) {
     if (error.code === 'P2025') {
@@ -265,6 +329,7 @@ router.delete('/:id', async (req, res) => {
     }
 
     await prisma.user.delete({ where: { id } });
+    await invalidateUserAccess(id);
     res.status(204).send();
   } catch (error) {
     if (error.code === 'P2025') {

@@ -5,12 +5,14 @@ import {
   MapPin, Compass, Shield, Building2, Network,
   Award, Activity, FileCheck, Plus, Pencil,
   Trash2, X, Search, CheckCircle2, AlertCircle,
-  Filter, Sparkles, Check
+  Filter, Sparkles, Check, UserCheck, PauseCircle,
+  Scale, BookOpen, Landmark
 } from 'lucide-react';
 import Modal from './ui/Modal';
 import ConfirmDialog from './ui/ConfirmDialog';
 import SearchableSelect from './ui/SearchableSelect';
 import { useToast } from './ui/ToastProvider';
+import { compareDesignationsByRank } from '../lib/officerAnalytics';
 
 const CATEGORIES = [
   {
@@ -70,6 +72,62 @@ const CATEGORIES = [
     apiCategory: 'proposalStatus',
     icon: FileCheck,
     description: 'Competent Authority 17-A proposal decision statuses (Pending, Accept, Returned with remarks).'
+  },
+  {
+    key: 'spp',
+    label: 'SPP',
+    singular: 'SPP',
+    apiCategory: 'spp',
+    icon: UserCheck,
+    description: 'Special Public Prosecutors (Spl PP / PP) mapped to parent Special Courts representing the Lokayukta.'
+  },
+  {
+    key: 'stay-type',
+    label: 'Stay Type',
+    singular: 'Stay Type',
+    apiCategory: 'stayType',
+    icon: PauseCircle,
+    description: 'Nature of the stay granted by the Hon\'ble High Court (interim stay, stay of investigation, etc.). Used in the Court Case form.'
+  },
+  {
+    key: 'working-designations',
+    label: 'Working Designations',
+    singular: 'Working Designation',
+    apiCategory: 'workingDesignation',
+    icon: Award,
+    description: 'Designations / ranks held by officers during previous postings from joining to present (e.g. Constable, ASI, PSI, PI, DySP, SP).'
+  },
+  {
+    key: 'working-districts',
+    label: 'Working Districts',
+    singular: 'Working District',
+    apiCategory: 'workingDistrict',
+    icon: MapPin,
+    description: 'Districts, commissionerates, and units for officer previous working places across Karnataka.'
+  },
+  {
+    key: 'acts',
+    label: 'Acts',
+    singular: 'Act',
+    apiCategory: 'act',
+    icon: BookOpen,
+    description: 'Acts of law applicable to Lokayukta court cases (e.g. Prevention of Corruption Act 1988, IPC, BNS, KLA).'
+  },
+  {
+    key: 'act-sections',
+    label: 'Sections',
+    singular: 'Section',
+    apiCategory: 'actSection',
+    icon: Scale,
+    description: 'Sections of law grouped under parent Acts for court case registration.'
+  },
+  {
+    key: 'court-names',
+    label: 'Court Names',
+    singular: 'Court Name',
+    apiCategory: 'courtName',
+    icon: Landmark,
+    description: 'Special Lokayukta and Sessions Courts mapped to parent districts across Karnataka hearing Lokayukta cases.'
   }
 ];
 
@@ -81,11 +139,14 @@ export default function Masters() {
 
   const [items, setItems] = useState([]);
   const [departments, setDepartments] = useState([]);
+  const [acts, setActs] = useState([]);
   const [districts, setDistricts] = useState([]);
+  const [courtNames, setCourtNames] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL'); // ALL, ACTIVE, INACTIVE
   const [districtFilter, setDistrictFilter] = useState('');
+  const [courtFilter, setCourtFilter] = useState('');
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
@@ -106,16 +167,22 @@ export default function Masters() {
     setSearchQuery('');
     setStatusFilter('ALL');
     setDistrictFilter('');
+    setCourtFilter('');
     fetchItems();
   }, [active.key]);
 
   const fetchItems = async () => {
     setLoading(true);
+    // Never keep the previous tab's rows (e.g. districts) under a new category's heading
+    setItems([]);
     try {
       const res = await apiFetch(baseUrl);
       if (res.ok) {
         const data = await res.json();
         setItems(Array.isArray(data) ? data : []);
+      } else {
+        const body = await res.json().catch(() => ({}));
+        showError(body.error || `Could not load ${active.label}. Please try again.`);
       }
 
       if (active.apiCategory === 'subDepartment') {
@@ -126,15 +193,32 @@ export default function Masters() {
         }
       }
 
-      if (active.hasDistrict) {
+      if (active.apiCategory === 'actSection') {
+        const actRes = await apiFetch('/master-items/act');
+        if (actRes.ok) {
+          const actData = await actRes.json();
+          setActs(Array.isArray(actData) ? actData : []);
+        }
+      }
+
+      if (active.hasDistrict || active.apiCategory === 'courtName') {
         const distRes = await apiFetch('/districts');
         if (distRes.ok) {
           const distData = await distRes.json();
           setDistricts(Array.isArray(distData) ? distData.filter(d => d.isActive) : []);
         }
       }
+
+      if (active.apiCategory === 'spp') {
+        const courtRes = await apiFetch('/master-items/courtName');
+        if (courtRes.ok) {
+          const courtData = await courtRes.json();
+          setCourtNames(Array.isArray(courtData) ? courtData.filter(c => c.isActive) : []);
+        }
+      }
     } catch (err) {
       console.error('Failed to fetch master items', err);
+      showError(`Could not load ${active.label}. Please try again.`);
     } finally {
       setLoading(false);
     }
@@ -146,7 +230,8 @@ export default function Masters() {
       name: '',
       shortName: '',
       isActive: true,
-      parentId: '',
+      parentId: (active.apiCategory === 'courtName' && districtFilter) ? districtFilter :
+                (active.apiCategory === 'spp' && courtFilter) ? courtFilter : '',
       districtId: districtFilter && districtFilter !== '__STATE_WIDE__' ? districtFilter : '',
       isAllDistricts: districtFilter === '__STATE_WIDE__'
     });
@@ -185,6 +270,17 @@ export default function Masters() {
       return;
     }
 
+    if (active.key === 'designations') {
+      const isDuplicate = items.some(item => 
+        (!editingItem || item.id !== editingItem.id) &&
+        item.name.trim().toLowerCase() === cleanName.toLowerCase()
+      );
+      if (isDuplicate) {
+        setError(`Designation "${cleanName}" already exists. Designation name must be unique.`);
+        return;
+      }
+    }
+
     if (active.isDistrict && form.shortName?.trim()) {
       const cleanShort = form.shortName.trim().toUpperCase();
       if (!/^[A-Z0-9]{1,4}$/.test(cleanShort)) {
@@ -195,6 +291,21 @@ export default function Masters() {
 
     if (active.apiCategory === 'subDepartment' && !form.parentId) {
       setError(`Parent Department is required.`);
+      return;
+    }
+
+    if (active.apiCategory === 'actSection' && !form.parentId) {
+      setError(`Parent Act is required.`);
+      return;
+    }
+
+    if (active.apiCategory === 'courtName' && !form.parentId) {
+      setError(`Parent District is required.`);
+      return;
+    }
+
+    if (active.apiCategory === 'spp' && !form.parentId) {
+      setError(`Parent Court is required.`);
       return;
     }
 
@@ -209,7 +320,12 @@ export default function Masters() {
         name: cleanName,
         isActive: form.isActive !== false,
         ...(active.isDistrict ? { shortName: form.shortName ? form.shortName.trim().toUpperCase() : null } : {}),
-        ...(active.apiCategory === 'subDepartment' ? { parentId: form.parentId } : {}),
+        ...(active.apiCategory === 'subDepartment' ||
+            active.apiCategory === 'actSection' ||
+            active.apiCategory === 'courtName' ||
+            active.apiCategory === 'spp'
+          ? { parentId: form.parentId || null }
+          : {}),
         ...(active.hasDistrict ? {
           districtId: form.isAllDistricts ? null : (form.districtId || null),
           isAllDistricts: form.isAllDistricts
@@ -259,9 +375,9 @@ export default function Masters() {
     }
   };
 
-  // Filtered items based on search, status, and district
+  // Filtered items based on search, status, district, and court
   const filteredItems = useMemo(() => {
-    return items.filter(item => {
+    const list = items.filter(item => {
       // Status filter
       if (statusFilter === 'ACTIVE' && !item.isActive) return false;
       if (statusFilter === 'INACTIVE' && item.isActive) return false;
@@ -276,6 +392,16 @@ export default function Masters() {
         }
       }
 
+      // District filter for Court Names
+      if (active.apiCategory === 'courtName' && districtFilter) {
+        if (item.parentId !== districtFilter) return false;
+      }
+
+      // Court filter for SPPs
+      if (active.apiCategory === 'spp' && courtFilter) {
+        if (item.parentId !== courtFilter) return false;
+      }
+
       // Search query
       if (!searchQuery.trim()) return true;
       const q = searchQuery.toLowerCase().trim();
@@ -284,6 +410,12 @@ export default function Masters() {
       const shortMatch = item.shortName?.toLowerCase().includes(q);
       const parentMatch = active.apiCategory === 'subDepartment'
         ? departments.find(d => d.id === item.parentId)?.name?.toLowerCase().includes(q)
+        : active.apiCategory === 'actSection'
+        ? acts.find(a => a.id === item.parentId)?.name?.toLowerCase().includes(q)
+        : active.apiCategory === 'courtName'
+        ? districts.find(d => d.id === item.parentId)?.name?.toLowerCase().includes(q)
+        : active.apiCategory === 'spp'
+        ? courtNames.find(c => c.id === item.parentId)?.name?.toLowerCase().includes(q)
         : false;
       const districtMatch = active.hasDistrict
         ? (item.district?.name?.toLowerCase().includes(q) || item.district?.shortName?.toLowerCase().includes(q) || (!item.district && ('all districts head office state-wide').includes(q)))
@@ -291,7 +423,19 @@ export default function Masters() {
 
       return nameMatch || shortMatch || parentMatch || districtMatch;
     });
-  }, [items, searchQuery, statusFilter, districtFilter, active.apiCategory, active.hasDistrict, departments]);
+
+    if (active.apiCategory === 'designations') {
+      return [...list].sort((a, b) => {
+        const distA = a.district?.name || '';
+        const distB = b.district?.name || '';
+        const distDiff = distA.localeCompare(distB, undefined, { sensitivity: 'base' });
+        if (distDiff !== 0) return distDiff;
+        return compareDesignationsByRank(a.name, b.name);
+      });
+    }
+
+    return list;
+  }, [items, searchQuery, statusFilter, districtFilter, courtFilter, active.apiCategory, active.hasDistrict, departments, acts, districts, courtNames]);
 
   const activeCount = useMemo(() => items.filter(i => i.isActive).length, [items]);
   const inactiveCount = useMemo(() => items.filter(i => !i.isActive).length, [items]);
@@ -367,7 +511,7 @@ export default function Masters() {
 
       {/* Top Category Tab Navigation */}
       <div>
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-thin">
+        <div className="flex flex-wrap items-center gap-2 pb-2">
           {CATEGORIES.map(c => {
             const Icon = c.icon;
             const isCurrent = active.key === c.key;
@@ -446,7 +590,21 @@ export default function Masters() {
                 <input
                   type="text"
                   className="app-input pl-10 pr-9 py-2 text-[13.5px] rounded-lg bg-white"
-                  placeholder={`Search ${active.label.toLowerCase()} by name${active.isDistrict ? ', short code' : active.hasDistrict ? ', district' : active.apiCategory === 'subDepartment' ? ', department' : ''}...`}
+                  placeholder={`Search ${active.label.toLowerCase()} by name${
+                    active.isDistrict
+                      ? ', short code'
+                      : active.hasDistrict
+                      ? ', district'
+                      : active.apiCategory === 'subDepartment'
+                      ? ', department'
+                      : active.apiCategory === 'actSection'
+                      ? ', act'
+                      : active.apiCategory === 'courtName'
+                      ? ', district'
+                      : active.apiCategory === 'spp'
+                      ? ', court'
+                      : ''
+                  }...`}
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
                 />
@@ -478,6 +636,44 @@ export default function Masters() {
                     ]}
                     label="Filter by District"
                     placeholder="All Jurisdictions"
+                  />
+                </div>
+              )}
+
+              {/* District Filter Dropdown for Court Names */}
+              {active.apiCategory === 'courtName' && districts.length > 0 && (
+                <div className="w-full sm:w-[240px]">
+                  <SearchableSelect
+                    value={districtFilter}
+                    onChange={setDistrictFilter}
+                    options={[
+                      { value: '', label: 'All Districts' },
+                      ...districts.map(d => ({
+                        value: d.id,
+                        label: d.shortName ? `${d.name} (${d.shortName})` : d.name
+                      }))
+                    ]}
+                    label="Filter by District"
+                    placeholder="All Districts"
+                  />
+                </div>
+              )}
+
+              {/* Court Filter Dropdown for SPPs */}
+              {active.apiCategory === 'spp' && courtNames.length > 0 && (
+                <div className="w-full sm:w-[280px]">
+                  <SearchableSelect
+                    value={courtFilter}
+                    onChange={setCourtFilter}
+                    options={[
+                      { value: '', label: 'All Courts' },
+                      ...courtNames.map(c => ({
+                        value: c.id,
+                        label: c.name
+                      }))
+                    ]}
+                    label="Filter by Court"
+                    placeholder="All Courts"
                   />
                 </div>
               )}
@@ -587,6 +783,21 @@ export default function Masters() {
                       Parent Department
                     </th>
                   )}
+                  {active.apiCategory === 'actSection' && (
+                    <th className="py-3 px-4 text-left text-[11px] font-bold uppercase tracking-wider text-ink-text-soft">
+                      Parent Act
+                    </th>
+                  )}
+                  {active.apiCategory === 'courtName' && (
+                    <th className="py-3 px-4 text-left text-[11px] font-bold uppercase tracking-wider text-ink-text-soft">
+                      Parent District
+                    </th>
+                  )}
+                  {active.apiCategory === 'spp' && (
+                    <th className="py-3 px-4 text-left text-[11px] font-bold uppercase tracking-wider text-ink-text-soft">
+                      Parent Court
+                    </th>
+                  )}
                   {(active.key === 'pe-status' || active.key === 'proposal-status') && (
                     <th className="py-3 px-4 text-left text-[11px] font-bold uppercase tracking-wider text-ink-text-soft">
                       Register Badge Preview
@@ -661,6 +872,41 @@ export default function Masters() {
                         <div className="flex items-center gap-1.5 text-[13px] text-ink-text-soft">
                           <Building2 className="w-3.5 h-3.5 text-ink-text-faint flex-shrink-0" />
                           <span>{departments.find(d => d.id === item.parentId)?.name || '—'}</span>
+                        </div>
+                      </td>
+                    )}
+
+                    {/* ActSection Parent Act */}
+                    {active.apiCategory === 'actSection' && (
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-1.5 text-[13px] text-ink-text-soft">
+                          <BookOpen className="w-3.5 h-3.5 text-ink-text-faint flex-shrink-0" />
+                          <span>{acts.find(a => a.id === item.parentId)?.name || '—'}</span>
+                        </div>
+                      </td>
+                    )}
+
+                    {/* CourtName Parent District */}
+                    {active.apiCategory === 'courtName' && (
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-1.5 text-[13px] text-ink-text font-medium">
+                          <MapPin className="w-3.5 h-3.5 text-brass flex-shrink-0" />
+                          <span>{districts.find(d => d.id === item.parentId)?.name || '—'}</span>
+                          {districts.find(d => d.id === item.parentId)?.shortName && (
+                            <span className="font-mono text-[10.5px] font-bold text-[#000E89] bg-[#E8EEF9] border border-[#CBD8EF] px-1.5 py-0.2 rounded">
+                              {districts.find(d => d.id === item.parentId)?.shortName}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                    )}
+
+                    {/* SPP Parent Court */}
+                    {active.apiCategory === 'spp' && (
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-1.5 text-[13px] text-ink-text-soft">
+                          <Landmark className="w-3.5 h-3.5 text-[#000E89] flex-shrink-0" />
+                          <span className="line-clamp-2 max-w-md">{courtNames.find(c => c.id === item.parentId)?.name || '—'}</span>
                         </div>
                       </td>
                     )}
@@ -821,6 +1067,57 @@ export default function Masters() {
                   options={departments.map(d => ({ value: d.id, label: d.name }))}
                   label="Select Parent Department"
                   placeholder="Search and select department..."
+                />
+              </div>
+            )}
+
+            {/* ActSection Parent Act Selector */}
+            {active.apiCategory === 'actSection' && (
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[12.5px] font-semibold text-ink-text">
+                  Parent Act <span className="text-brick">*</span>
+                </label>
+                <SearchableSelect
+                  value={form.parentId}
+                  onChange={v => setForm({ ...form, parentId: v })}
+                  options={acts.map(a => ({ value: a.id, label: a.name }))}
+                  label="Select Parent Act"
+                  placeholder="Search and select act..."
+                />
+              </div>
+            )}
+
+            {/* CourtName Parent District Selector */}
+            {active.apiCategory === 'courtName' && (
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[12.5px] font-semibold text-ink-text">
+                  Parent District <span className="text-brick">*</span>
+                </label>
+                <SearchableSelect
+                  value={form.parentId}
+                  onChange={v => setForm({ ...form, parentId: v })}
+                  options={districts.map(d => ({
+                    value: d.id,
+                    label: d.shortName ? `${d.name} (${d.shortName})` : d.name
+                  }))}
+                  label="Select Parent District"
+                  placeholder="Search and select district..."
+                />
+              </div>
+            )}
+
+            {/* SPP Parent Court Selector */}
+            {active.apiCategory === 'spp' && (
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[12.5px] font-semibold text-ink-text">
+                  Parent Court <span className="text-brick">*</span>
+                </label>
+                <SearchableSelect
+                  value={form.parentId}
+                  onChange={v => setForm({ ...form, parentId: v })}
+                  options={courtNames.map(c => ({ value: c.id, label: c.name }))}
+                  label="Select Parent Court"
+                  placeholder="Search and select court..."
                 />
               </div>
             )}

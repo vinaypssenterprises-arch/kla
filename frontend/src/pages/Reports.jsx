@@ -1076,7 +1076,16 @@ export default function Reports() {
   }, [rawPetitions, currentYear, minYear]);
 
   const peStatusData = chartExtraData?.petitionsByPeStatus || [];
-  const officerDistData = (chartExtraData?.officersByDistrict || []).filter(r => r.count > 0).slice(0, 12);
+  const dispatchStatusData = useMemo(() => {
+    const t = statsData.totals || {};
+    return [
+      { stage: 'Received at HQ', count: t.totalReceivedAtHq || 0 },
+      { stage: 'Sent to CA', count: t.proposalsSentToCA || 0 },
+      { stage: 'Pending with CA', count: t.pendingWithCA || 0 },
+      { stage: 'Not Sent to CA', count: t.notSentToCA || 0 },
+      { stage: 'Returned to Unit', count: t.proposalsSentBackToDist || 0 }
+    ];
+  }, [statsData.totals]);
 
   return (
     <div style={{ animation: 'fadeSlideIn 0.3s ease-out' }} className="pb-16">
@@ -2914,21 +2923,21 @@ export default function Reports() {
             )}
           </div>
 
-          {/* Officers by District */}
+          {/* Proposal dispatch status (respects the year / date / district filters above) */}
           <div className="bg-[#FFFDF7] border border-rule rounded-xl p-6 shadow-soft">
             <SectionHeader
               icon={Briefcase}
-              title="Officers Deployed by District"
-              subtitle="Active vigilance officer headcount per district"
+              title="Proposal Dispatch Status"
+              subtitle="Where the filtered proposals stand with the Competent Authority"
             />
-            {loading ? <SkeletonChart /> : officerDistData.length === 0 ? <EmptyChart label="No officer data found." /> : (
+            {loading ? <SkeletonChart /> : !dispatchStatusData[0].count ? <EmptyChart label="No proposals in the selected period." /> : (
               <ResponsiveContainer width="100%" height={260}>
-                <BarChart data={officerDistData} layout="vertical" margin={{ top: 5, right: 20, left: 60, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(16,24,38,0.06)" horizontal={false} />
+                <BarChart data={dispatchStatusData} layout="vertical" margin={{ top: 5, right: 30, left: 10, bottom: 5 }}>
+                  <CartesianGrid stroke="rgba(16,24,38,0.06)" horizontal={false} />
                   <XAxis type="number" tick={{ fontSize: 11, fill: '#6E6248' }} allowDecimals={false} />
-                  <YAxis type="category" dataKey="district" tick={{ fontSize: 11, fill: '#6E6248' }} width={75} />
-                  <Tooltip content={<CustomBarTooltip />} />
-                  <Bar dataKey="count" name="Officers" fill="#A97B33" radius={[0, 5, 5, 0]} maxBarSize={22} />
+                  <YAxis type="category" dataKey="stage" tick={{ fontSize: 11.5, fill: '#241E14', fontWeight: 600 }} width={120} />
+                  <Tooltip content={<CustomBarTooltip />} cursor={{ fill: 'rgba(126,42,52,0.05)' }} />
+                  <Bar dataKey="count" name="Proposals" fill="#7E2A34" radius={[0, 4, 4, 0]} maxBarSize={22} label={{ position: 'right', fontSize: 11, fill: '#6E6248', fontWeight: 600 }} />
                 </BarChart>
               </ResponsiveContainer>
             )}

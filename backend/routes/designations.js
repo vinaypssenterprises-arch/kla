@@ -3,6 +3,7 @@ const router = express.Router();
 const prisma = require('../prismaClient');
 const redisClient = require('../redisClient');
 const { authMiddleware } = require('./auth');
+const { compareDesignationsByRank } = require('./officers');
 
 router.use(authMiddleware);
 
@@ -33,8 +34,16 @@ router.get('/', async (req, res) => {
         district: {
           select: { id: true, name: true, shortName: true }
         }
-      },
-      orderBy: { createdAt: 'desc' }
+      }
+    });
+
+    // Sort by District name, then Rank Hierarchy (SP -> Addl SP -> DySP -> PI -> PSI -> ASI -> HC -> PC -> Other)
+    designations.sort((a, b) => {
+      const distA = a.district?.name || '';
+      const distB = b.district?.name || '';
+      const distDiff = distA.localeCompare(distB, undefined, { sensitivity: 'base' });
+      if (distDiff !== 0) return distDiff;
+      return compareDesignationsByRank(a.name, b.name);
     });
 
     await redisClient.setEx(cacheKey, 300, JSON.stringify(designations));
@@ -67,15 +76,14 @@ router.post('/', async (req, res) => {
       targetDistrictId = cleanDistrictId;
     }
 
+    // Check unique designation name (case-insensitive)
     const existing = await prisma.designation.findFirst({
       where: {
-        name: { equals: cleanName, mode: 'insensitive' },
-        districtId: targetDistrictId
+        name: { equals: cleanName, mode: 'insensitive' }
       }
     });
     if (existing) {
-      const locText = targetDistrictId ? 'in the selected district' : 'for All Districts / Head Office';
-      return res.status(409).json({ error: `Designation "${cleanName}" already exists ${locText}` });
+      return res.status(409).json({ error: `Designation "${cleanName}" already exists. Designation name must be unique.` });
     }
 
     const designation = await prisma.designation.create({
@@ -122,16 +130,15 @@ router.put('/:id', async (req, res) => {
       targetDistrictId = cleanDistrictId;
     }
 
+    // Check unique designation name (case-insensitive, excluding current record)
     const existing = await prisma.designation.findFirst({
       where: {
         name: { equals: cleanName, mode: 'insensitive' },
-        districtId: targetDistrictId,
         NOT: { id }
       }
     });
     if (existing) {
-      const locText = targetDistrictId ? 'in the selected district' : 'for All Districts / Head Office';
-      return res.status(409).json({ error: `Designation "${cleanName}" already exists ${locText}` });
+      return res.status(409).json({ error: `Designation "${cleanName}" already exists. Designation name must be unique.` });
     }
 
     const designation = await prisma.designation.update({

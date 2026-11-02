@@ -3,8 +3,11 @@ const router = express.Router();
 const prisma = require('../prismaClient');
 const redisClient = require('../redisClient');
 const { authMiddleware } = require('./auth');
+const { requireModule } = require('../modulePermissions');
 
 router.use(authMiddleware);
+// Every dashboard endpoint here serves the Petitions module
+router.use(requireModule('petitions'));
 
 router.get('/stats', async (req, res) => {
   try {
