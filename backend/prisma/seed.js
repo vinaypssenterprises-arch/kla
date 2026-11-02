@@ -75,12 +75,15 @@ async function seedMasterItems() {
   let count = 0;
   for (const [category, names] of Object.entries(MASTER_ITEMS)) {
     for (const name of names) {
-      await prisma.masterItem.upsert({
-        where: { category_name: { category, name } },
-        update: {},
-        create: { category, name }
+      const existing = await prisma.masterItem.findFirst({
+        where: { category, name }
       });
-      count++;
+      if (!existing) {
+        await prisma.masterItem.create({
+          data: { category, name, isActive: true }
+        });
+        count++;
+      }
     }
   }
   console.log(`Seeded ${count} master items (${Object.keys(MASTER_ITEMS).join(', ')})`);
@@ -484,20 +487,26 @@ async function seedDepartments() {
   let subDeptCount = 0;
 
   for (const [deptName, subDepts] of Object.entries(DEPARTMENTS)) {
-    const department = await prisma.masterItem.upsert({
-      where: { category_name: { category: 'department', name: deptName } },
-      update: {},
-      create: { category: 'department', name: deptName }
+    let department = await prisma.masterItem.findFirst({
+      where: { category: 'department', name: deptName }
     });
-    deptCount++;
+    if (!department) {
+      department = await prisma.masterItem.create({
+        data: { category: 'department', name: deptName, isActive: true }
+      });
+      deptCount++;
+    }
 
     for (const subDeptName of subDepts) {
-      await prisma.masterItem.upsert({
-        where: { category_name: { category: 'subDepartment', name: subDeptName } },
-        update: {},
-        create: { category: 'subDepartment', name: subDeptName, parentId: department.id }
+      const existingSub = await prisma.masterItem.findFirst({
+        where: { category: 'subDepartment', name: subDeptName, parentId: department.id }
       });
-      subDeptCount++;
+      if (!existingSub) {
+        await prisma.masterItem.create({
+          data: { category: 'subDepartment', name: subDeptName, parentId: department.id, isActive: true }
+        });
+        subDeptCount++;
+      }
     }
   }
 
