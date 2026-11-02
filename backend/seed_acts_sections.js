@@ -142,12 +142,6 @@ const DATA = [
   ["THE KARNATAKA LAND (RESTRICTION ON TRANSFER) ACT, 1991", "9"]
 ];
 
-async function seed() {
-  console.log('Clearing existing act and actSection master items...');
-  const delSec = await prisma.masterItem.deleteMany({ where: { category: 'actSection' } });
-  const delAct = await prisma.masterItem.deleteMany({ where: { category: 'act' } });
-  console.log(`Deleted ${delSec.count} sections and ${delAct.count} acts.`);
-
 async function seedActsAndSections(prismaClient = prisma, force = false) {
   const existing = await prismaClient.masterItem.count({ where: { category: 'act' } });
   if (existing > 0 && !force) {
